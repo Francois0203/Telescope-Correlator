@@ -50,6 +50,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Compute lowercase repository name
+        id: repo
+        shell: bash
+        run: |
+          # Lowercase the GITHUB_REPOSITORY (owner/repo) for Docker tag safety
+          echo "repo_lc=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
       - name: Set up QEMU (for cross-platform builds)
         uses: docker/setup-qemu-action@v2
 
@@ -62,7 +69,7 @@ jobs:
           context: ./app
           push: false
           tags: |
-            ghcr.io/${{ toLower(github.repository) }}:ci-${{ github.sha }}
+            ghcr.io/${{ steps.repo.outputs.repo_lc }}:ci-${{ github.sha }}
 
   publish:
     name: Publish Docker image to GHCR
@@ -75,6 +82,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Compute lowercase repository name
+        id: repo
+        shell: bash
+        run: |
+          echo "repo_lc=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
@@ -89,6 +102,6 @@ jobs:
           context: ./app
           push: true
           tags: |
-            ghcr.io/${{ toLower(github.repository) }}:latest
-            ghcr.io/${{ toLower(github.repository) }}:${{ github.sha }}
+            ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest
+            ghcr.io/${{ steps.repo.outputs.repo_lc }}:${{ github.sha }}
 
