@@ -62,7 +62,7 @@ jobs:
           context: ./app
           push: false
           tags: |
-            ghcr.io/${{ github.repository }}:ci-${{ github.sha }}
+            ghcr.io/${{ toLower(github.repository) }}:ci-${{ github.sha }}
 
   publish:
     name: Publish Docker image to GHCR
@@ -89,6 +89,6 @@ jobs:
           context: ./app
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ toLower(github.repository) }}:latest
+            ghcr.io/${{ toLower(github.repository) }}:${{ github.sha }}
 
