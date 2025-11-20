@@ -1,0 +1,10 @@
+.venv
+.git
+.gitignore
+.github/
+__pycache__/
+*.py[cod]
+tests_harness/test_data/
+.env
+.DS_Store
+Thumbs.db

@@ -12,7 +12,7 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 
 # Put the app sources on the image and set PYTHONPATH so package can be imported
-COPY src/ /app/src/
+COPY app/src/ /app/src/
 ENV PYTHONPATH=/app/src
 
 # Lightweight entry: run the correlator CLI
