@@ -1,0 +1,8 @@
+﻿n_ants: 4
+n_channels: 256
+sample_rate: 1024.0
+integration_time: 1.0
+sim_duration: 2.0
+sim_snr: 15.0
+window_type: hamming
+output_dir: ../dev_workspace/outputs

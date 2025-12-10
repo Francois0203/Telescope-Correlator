@@ -1,0 +1,29 @@
+ant_positions: null
+ant_radius: 10.0
+center_freq: 1.0
+chunk_size: 1024
+enable_delays: true
+input_file: null
+integration_time: 1.0
+max_integrations: null
+mode: simulated
+n_ants: 4
+n_channels: 128
+output_dir: ../../dev_workspace/outputs
+overlap_factor: 0.0
+phase_center:
+- 1.0
+- 0.0
+- 0.0
+quantize_bits: 0
+sample_rate: 1024.0
+save_channelised: false
+save_visibilities: true
+sim_duration: 1.0
+sim_freq: 1.0
+sim_realtime: false
+sim_snr: 20.0
+sim_source_angles:
+- 0.0
+- 0.5235987755982988
+window_type: hanning
