@@ -1,31 +1,10 @@
-"""Small CLI entrypoint for the correlator app.
+"""FX Correlator CLI entrypoint
 
-Example:
+Run the correlator from the command line:
     python -m correlator --help
+    python -m correlator --n-ants 4 --n-channels 256
 """
-from __future__ import annotations
-
-import argparse
-import sys
-import numpy as np
-from .core import Correlator
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="correlator")
-    parser.add_argument("--example", action="store_true", help="Run a tiny example")
-    args = parser.parse_args(argv)
-
-    if args.example:
-        x = np.sin(np.linspace(0, 2 * np.pi, 128))
-        y = np.roll(x, 5)
-        c = Correlator()
-        corr = c.correlate(x, y, mode="same")
-        print(f"corr peak index: {np.argmax(corr)}")
-        return 0
-
-    parser.print_help()
-    return 0
+from correlator.cli import main
 
 
 if __name__ == "__main__":
