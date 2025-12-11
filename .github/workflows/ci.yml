@@ -52,6 +52,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
+      attestations: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,8 +93,9 @@ jobs:
 
       - name: Generate artifact attestation
         if: github.ref == 'refs/heads/main'
+        continue-on-error: true
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ghcr.io/${{ steps.repo.outputs.repo_lc }}
+          subject-name: ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
