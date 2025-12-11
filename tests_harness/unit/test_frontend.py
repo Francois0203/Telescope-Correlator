@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from pathlib import Path
 import tempfile
-from correlator.frontend import SimulatedStream, BatchFileSource
+from correlator.core.frontend import SimulatedStream, BatchFileSource
 
 
 class TestSimulatedStream:

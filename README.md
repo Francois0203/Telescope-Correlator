@@ -1,10 +1,34 @@
 # Telescope Correlator
 
-A complete radio telescope correlator implementation with FX architecture, fully containerized for easy deployment and testing.
+A complete radio telescope correlator implementation with FX architecture, fully containerized with an interactive CLI for easy deployment and testing.
 
-## 🚀 Quick Start (Docker)
+## 🚀 Quick Start
 
-**For complete Docker usage instructions, see [DOCKER_README.md](DOCKER_README.md)**
+### Interactive CLI (Recommended)
+
+Start a persistent interactive shell for repeated correlator runs:
+
+```bash
+# Windows
+.\docker-run.bat cli
+
+# Linux/macOS  
+./docker-run.sh cli
+```
+
+Inside the CLI shell:
+```
+correlator> run --n-ants 4 --n-channels 256 --sim-duration 1.0
+correlator> config
+correlator> status
+correlator> help
+```
+
+**See [CLI_GUIDE.md](CLI_GUIDE.md) for complete interactive CLI documentation.**
+
+### One-Shot Execution
+
+For single batch runs:
 
 ```bash
 # Pull the published image
@@ -16,6 +40,8 @@ docker compose run --rm correlator python -m correlator --n-ants 4 --n-channels 
 # Run tests
 docker compose run --rm test
 ```
+
+**See [DOCKER_README.md](DOCKER_README.md) for complete Docker usage instructions.**
 
 ## 📋 Project Status
 
@@ -59,11 +85,16 @@ docker compose run --rm dev
 
 ```
 telescope-correlator/
-├── app/src/                   # Core correlator implementation
+├── app/src/correlator/       # Core correlator implementation
+│   ├── core/                 # Signal processing modules
+│   ├── cli/                  # Interactive CLI and commands
+│   ├── utils/                # Utility functions
+│   └── config.py             # Configuration management
 ├── tests_harness/            # Complete test suite
 ├── dev_workspace/outputs/    # Generated results (gitignored)
 ├── docker-compose.yml        # Docker services configuration
 ├── docker-run.sh/.bat        # Cross-platform management scripts
+├── CLI_GUIDE.md              # Interactive CLI documentation
 ├── DOCKER_README.md          # Complete Docker usage guide
 └── visualize_*.py           # Result visualization tools
 ```
@@ -78,6 +109,7 @@ telescope-correlator/
 
 ## 📖 Documentation
 
+- **[CLI_GUIDE.md](CLI_GUIDE.md)** - Interactive CLI shell documentation (START HERE!)
 - **[DOCKER_README.md](DOCKER_README.md)** - Complete Docker usage guide
 - **[USAGE_GUIDE.md](USAGE_GUIDE.md)** - Detailed correlator usage and parameters
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical architecture documentation

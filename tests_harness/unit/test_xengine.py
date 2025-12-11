@@ -1,7 +1,7 @@
 """Unit tests for X-Engine (correlator) module."""
 import numpy as np
 import pytest
-from correlator.xengine import XEngine, get_baseline_indices
+from correlator.core.xengine import XEngine, get_baseline_indices
 
 
 class TestBaselineIndices:

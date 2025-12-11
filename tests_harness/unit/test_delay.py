@@ -1,7 +1,7 @@
 """Unit tests for delay compensation module."""
 import numpy as np
 import pytest
-from correlator.delay import DelayEngine, calculate_geometric_delays
+from correlator.core.delay import DelayEngine, calculate_geometric_delays
 
 
 class TestGeometricDelays:

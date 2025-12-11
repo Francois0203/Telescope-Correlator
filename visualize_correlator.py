@@ -55,7 +55,7 @@ def load_and_visualize(vis_file, show_raw_signals=True, save_plots=True):
     # 1. Raw antenna signals (if requested)
     if show_raw_signals:
         print("Generating sample of raw antenna signals...")
-        from correlator.frontend import SimulatedStream
+        from correlator.core.frontend import SimulatedStream
 
         # Create sample signals (short duration for visualization)
         sim_source = SimulatedStream(

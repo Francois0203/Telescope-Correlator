@@ -1,6 +1,8 @@
 # Telescope Correlator - Docker Usage Guide
 
-This repository contains a radio telescope correlator implemented in Python, fully containerized with Docker for easy deployment and testing. **This guide focuses exclusively on using the published Docker images.**
+This repository contains a radio telescope correlator implemented in Python, fully containerized with Docker for easy deployment and testing. **This guide focuses on using the published Docker images.**
+
+> **💡 New!** The correlator now includes an **interactive CLI shell** for persistent container operation. See [CLI_GUIDE.md](CLI_GUIDE.md) for details.
 
 ## 🐳 Docker Setup
 
@@ -13,6 +15,27 @@ The application runs entirely in Docker containers using pre-built images publis
 - At least 2GB free disk space for Docker images
 
 ### Quick Start
+
+#### Option 1: Interactive CLI (Recommended)
+
+Start a persistent interactive correlator shell:
+
+```bash
+# Windows
+.\docker-run.bat cli
+
+# Linux/macOS
+./docker-run.sh cli
+
+# Or directly
+docker compose up cli
+```
+
+This starts a container that runs continuously with an interactive CLI. See [CLI_GUIDE.md](CLI_GUIDE.md) for full documentation.
+
+#### Option 2: One-Shot Execution
+
+For single batch runs:
 
 1. **Pull the published Docker image:**
    ```bash

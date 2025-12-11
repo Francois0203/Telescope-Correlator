@@ -77,6 +77,13 @@ pull-run() {
     docker run --rm -v "$(pwd)/dev_workspace/outputs:/app/outputs" ghcr.io/francois0203/telescope-correlator:latest python -m correlator "$@"
 }
 
+# Start interactive CLI shell
+cli() {
+    log_info "Starting interactive correlator CLI..."
+    cd "$PROJECT_ROOT"
+    docker compose up cli
+}
+
 # Show usage
 usage() {
     echo "Telescope Correlator Docker Management Script"
@@ -84,6 +91,7 @@ usage() {
     echo "Usage: $0 <command> [options]"
     echo ""
     echo "Commands:"
+    echo "  cli       Start interactive correlator CLI (persistent)"
     echo "  build     Build the Docker image"
     echo "  test      Run the test suite"
     echo "  run       Run the correlator (pass correlator args after --)"
@@ -93,6 +101,7 @@ usage() {
     echo "  help      Show this help message"
     echo ""
     echo "Examples:"
+    echo "  $0 cli       # Start interactive CLI shell"
     echo "  $0 build"
     echo "  $0 test"
     echo "  $0 run -- --n-ants 4 --n-channels 128 --sim-duration 1.0"
@@ -103,6 +112,10 @@ usage() {
 
 # Main command dispatcher
 case "${1:-help}" in
+    cli)
+        check_docker
+        cli
+        ;;
     build)
         check_docker
         build

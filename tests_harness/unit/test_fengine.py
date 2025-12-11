@@ -1,7 +1,7 @@
 """Unit tests for F-Engine (channeliser) module."""
 import numpy as np
 import pytest
-from correlator.fengine import FEngine, get_window, quantize_signal
+from correlator.core.fengine import FEngine, get_window, quantize_signal
 
 
 class TestWindowFunctions:

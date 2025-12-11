@@ -3,6 +3,7 @@ REM Docker management script for Telescope Correlator (Windows)
 
 cd /d "%~dp0"
 
+if "%1"=="cli" goto cli
 if "%1"=="build" goto build
 if "%1"=="test" goto test
 if "%1"=="run" goto run
@@ -10,6 +11,11 @@ if "%1"=="pull-run" goto pull-run
 if "%1"=="dev" goto dev
 if "%1"=="clean" goto clean
 goto help
+
+:cli
+echo [INFO] Starting interactive correlator CLI...
+docker compose up cli
+goto end
 
 :build
 echo [INFO] Building Docker image...
@@ -54,6 +60,7 @@ echo.
 echo Usage: %0 ^<command^> [options]
 echo.
 echo Commands:
+echo   cli       Start interactive correlator CLI (persistent)
 echo   build     Build the Docker image
 echo   test      Run the test suite
 echo   run       Run the correlator (pass correlator args after command)
