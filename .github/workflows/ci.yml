@@ -18,7 +18,7 @@ jobs:
         run: docker compose build
 
       - name: Create test output directory
-        run: mkdir -p test-outputs
+        run: mkdir -p dev_workspace/outputs
 
       - name: Run tests in Docker
         run: |
@@ -30,8 +30,8 @@ jobs:
 
       - name: Verify outputs were created
         run: |
-          ls -la test-outputs/
-          if [ ! -f "test-outputs/visibility_0001.npy" ]; then
+          ls -la dev_workspace/outputs/
+          if [ ! -f "dev_workspace/outputs/visibility_0001.npy" ]; then
             echo "Error: Correlator did not produce expected output"
             exit 1
           fi
@@ -42,7 +42,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: test-outputs/
+          path: dev_workspace/outputs/
 
   build-and-publish:
     name: Build and Publish Docker image
