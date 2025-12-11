@@ -14,40 +14,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
       - name: Build Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./app/Dockerfile
-          push: false
-          tags: telescope-correlator:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: docker-compose build
 
       - name: Create test output directory
         run: mkdir -p test-outputs
 
       - name: Run tests in Docker
         run: |
-          docker run --rm \
-            -v $(pwd):/workspace \
-            -v $(pwd)/test-outputs:/app/outputs \
-            telescope-correlator:test \
-            pytest tests_harness/ -v --tb=short --junitxml=/workspace/test-results.xml
+          docker-compose run --rm test
+
+      - name: Test correlator functionality
+        run: |
+          docker-compose run --rm correlator python -m correlator --n-ants 4 --n-channels 64 --sim-duration 0.5 --output-dir /app/outputs
+
+      - name: Verify outputs were created
+        run: |
+          ls -la test-outputs/
+          if [ ! -f "test-outputs/visibility_0001.npy" ]; then
+            echo "Error: Correlator did not produce expected output"
+            exit 1
+          fi
+          echo "✓ Correlator successfully generated visibility data"
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: |
-            test-results.xml
-            test-outputs/
-
-      - name: Test correlator functionality
+          path: test-outputs/
         run: |
           docker run --rm \
             -v $(pwd)/test-outputs:/app/outputs \
@@ -114,4 +109,3 @@ jobs:
           subject-name: ghcr.io/${{ steps.repo.outputs.repo_lc }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
-
