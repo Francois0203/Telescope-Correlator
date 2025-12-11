@@ -14,7 +14,7 @@ class CorrelatorShell(cmd.Cmd):
     
     intro = """
 ╔══════════════════════════════════════════════════════════════╗
-║         Telescope Correlator - Interactive CLI              ║
+║         Telescope Correlator - Interactive CLI               ║
 ║                    FX Architecture                           ║
 ╚══════════════════════════════════════════════════════════════╝
 
