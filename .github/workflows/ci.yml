@@ -15,18 +15,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build Docker image
-        run: docker-compose build
+        run: docker compose build
 
       - name: Create test output directory
         run: mkdir -p test-outputs
 
       - name: Run tests in Docker
         run: |
-          docker-compose run --rm test
+          docker compose run --rm test
 
       - name: Test correlator functionality
         run: |
-          docker-compose run --rm correlator python -m correlator --n-ants 4 --n-channels 64 --sim-duration 0.5 --output-dir /app/outputs
+          docker compose run --rm correlator python -m correlator --n-ants 4 --n-channels 64 --sim-duration 0.5 --output-dir /app/outputs
 
       - name: Verify outputs were created
         run: |
