@@ -96,7 +96,7 @@ jobs:
         continue-on-error: true
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest
+          subject-name: ghcr.io/${{ steps.repo.outputs.repo_lc }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
@@ -110,8 +110,8 @@ jobs:
           docker pull ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest
 
           echo "🧪 Running tests with published image..."
-          # Run tests with published image
-          docker run --rm ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest pytest tests_harness/ -v --tb=short
+          # Run tests with published image (mount test directory)
+          docker run --rm -w /workspace -v $(pwd)/tests_harness:/workspace/tests_harness -v $(pwd)/dev_workspace/outputs:/app/outputs ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest pytest tests_harness/ -v --tb=short
 
           echo "🔬 Running correlator with published image..."
           # Run correlator with published image
