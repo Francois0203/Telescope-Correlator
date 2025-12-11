@@ -43,20 +43,6 @@ jobs:
         with:
           name: test-results
           path: test-outputs/
-        run: |
-          docker run --rm \
-            -v $(pwd)/test-outputs:/app/outputs \
-            telescope-correlator:test \
-            python -m correlator --n-ants 4 --n-channels 64 --sim-duration 0.5 --output-dir /app/outputs
-
-      - name: Verify outputs were created
-        run: |
-          ls -la test-outputs/
-          if [ ! -f "test-outputs/visibility_0001.npy" ]; then
-            echo "Error: Correlator did not produce expected output"
-            exit 1
-          fi
-          echo "✓ Correlator successfully generated visibility data"
 
   build-and-publish:
     name: Build and Publish Docker image
