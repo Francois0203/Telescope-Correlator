@@ -85,8 +85,8 @@ jobs:
           file: ./app/Dockerfile
           push: ${{ github.ref == 'refs/heads/main' }}
           tags: |
-            ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest
-            ghcr.io/${{ steps.repo.outputs.repo_lc }}:${{ github.sha }}
+            "ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest"
+            "ghcr.io/${{ steps.repo.outputs.repo_lc }}:v1"
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
