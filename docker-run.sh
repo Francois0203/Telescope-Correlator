@@ -66,13 +66,15 @@ dev() {
     docker compose run --rm dev
 }
 
-# Clean up Docker resources
-clean() {
-    log_info "Cleaning up Docker resources..."
+# Pull and run latest published image
+pull-run() {
+    log_info "Pulling latest published image..."
     cd "$PROJECT_ROOT"
-    docker compose down -v --rmi local 2>/dev/null || true
-    docker system prune -f
-    log_success "Cleanup completed"
+    docker pull ghcr.io/francois0203/telescope-correlator:latest
+    log_success "Latest image pulled successfully"
+
+    log_info "Running correlator with latest image..."
+    docker run --rm -v "$(pwd)/dev_workspace/outputs:/app/outputs" ghcr.io/francois0203/telescope-correlator:latest python -m correlator "$@"
 }
 
 # Show usage
@@ -85,6 +87,7 @@ usage() {
     echo "  build     Build the Docker image"
     echo "  test      Run the test suite"
     echo "  run       Run the correlator (pass correlator args after --)"
+    echo "  pull-run  Pull latest published image and run correlator"
     echo "  dev       Start development shell"
     echo "  clean     Clean up Docker resources"
     echo "  help      Show this help message"
@@ -93,6 +96,7 @@ usage() {
     echo "  $0 build"
     echo "  $0 test"
     echo "  $0 run -- --n-ants 4 --n-channels 128 --sim-duration 1.0"
+    echo "  $0 pull-run -- --n-ants 4 --n-channels 64 --sim-duration 0.5"
     echo "  $0 dev"
     echo "  $0 clean"
 }
@@ -111,6 +115,11 @@ case "${1:-help}" in
         check_docker
         shift
         run "$@"
+        ;;
+    pull-run)
+        check_docker
+        shift
+        pull-run "$@"
         ;;
     dev)
         check_docker

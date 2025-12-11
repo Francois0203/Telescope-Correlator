@@ -2,9 +2,7 @@ version: '3.8'
 
 services:
   correlator:
-    build:
-      context: .
-      dockerfile: app/Dockerfile
+    image: ghcr.io/francois0203/telescope-correlator:latest
     container_name: telescope-correlator
     volumes:
       # Mount outputs directory so results are saved outside container
@@ -14,9 +12,7 @@ services:
 
   # Test service for running the test suite
   test:
-    build:
-      context: .
-      dockerfile: app/Dockerfile
+    image: ghcr.io/francois0203/telescope-correlator:latest
     container_name: telescope-correlator-test
     volumes:
       # Mount the entire project for testing
@@ -29,9 +25,7 @@ services:
 
   # Development service with interactive shell
   dev:
-    build:
-      context: .
-      dockerfile: app/Dockerfile
+    image: ghcr.io/francois0203/telescope-correlator:latest
     container_name: telescope-correlator-dev
     volumes:
       - .:/workspace

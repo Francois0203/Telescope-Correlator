@@ -6,6 +6,7 @@ cd /d "%~dp0"
 if "%1"=="build" goto build
 if "%1"=="test" goto test
 if "%1"=="run" goto run
+if "%1"=="pull-run" goto pull-run
 if "%1"=="dev" goto dev
 if "%1"=="clean" goto clean
 goto help
@@ -25,6 +26,14 @@ goto end
 :run
 echo [INFO] Running correlator...
 docker compose run --rm correlator python -m correlator %2 %3 %4 %5 %6 %7 %8 %9
+goto end
+
+:pull-run
+echo [INFO] Pulling latest published image...
+docker pull ghcr.io/francois0203/telescope-correlator:latest
+echo [SUCCESS] Latest image pulled successfully
+echo [INFO] Running correlator with latest image...
+docker run --rm -v "%~dp0dev_workspace\outputs:/app/outputs" ghcr.io/francois0203/telescope-correlator:latest python -m correlator %2 %3 %4 %5 %6 %7 %8 %9
 goto end
 
 :dev
@@ -48,6 +57,7 @@ echo Commands:
 echo   build     Build the Docker image
 echo   test      Run the test suite
 echo   run       Run the correlator (pass correlator args after command)
+echo   pull-run  Pull latest published image and run correlator
 echo   dev       Start development shell
 echo   clean     Clean up Docker resources
 echo   help      Show this help message

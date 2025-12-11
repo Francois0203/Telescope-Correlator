@@ -99,3 +99,31 @@ jobs:
           subject-name: ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
+
+      - name: Verify published image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "🧪 Testing published Docker image..."
+          echo "📦 Pulling image: ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest"
+
+          # Pull the published image
+          docker pull ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest
+
+          echo "🧪 Running tests with published image..."
+          # Run tests with published image
+          docker run --rm ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest pytest tests_harness/ -v --tb=short
+
+          echo "🔬 Running correlator with published image..."
+          # Run correlator with published image
+          mkdir -p test-results
+          docker run --rm -v $(pwd)/test-results:/app/outputs ghcr.io/${{ steps.repo.outputs.repo_lc }}:latest python -m correlator --n-ants 4 --n-channels 64 --sim-duration 0.5 --output-dir /app/outputs
+
+          echo "📊 Checking generated outputs..."
+          ls -la test-results/
+          if [ -f "test-results/visibility_0001.npy" ]; then
+            echo "✅ Published image verification successful!"
+            echo "📁 Generated $(ls test-results/*.npy | wc -l) visibility files"
+          else
+            echo "❌ Published image verification failed - no outputs generated"
+            exit 1
+          fi
