@@ -8,7 +8,7 @@ integration_time: 1.0
 max_integrations: null
 mode: simulated
 n_ants: 4
-n_channels: 128
+n_channels: 64
 output_dir: /app/outputs
 overlap_factor: 0.0
 phase_center:
@@ -19,7 +19,7 @@ quantize_bits: 0
 sample_rate: 1024.0
 save_channelised: false
 save_visibilities: true
-sim_duration: 1.0
+sim_duration: 0.5
 sim_freq: 1.0
 sim_realtime: false
 sim_snr: 20.0

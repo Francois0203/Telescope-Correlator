@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  correlator:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: telescope-correlator
+    volumes:
+      # Mount outputs directory so results are saved outside container
+      - ./dev_workspace/outputs:/app/outputs
+    working_dir: /app
+    command: ["python", "-m", "correlator", "--help"]
+
+  # Test service for running the test suite
+  test:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: telescope-correlator-test
+    volumes:
+      # Mount the entire project for testing
+      - .:/workspace
+      - ./dev_workspace/outputs:/app/outputs
+    working_dir: /workspace
+    command: ["pytest", "tests_harness/", "-v", "--tb=short"]
+    environment:
+      - PYTHONPATH=/usr/local/lib/python3.11/site-packages
+
+  # Development service with interactive shell
+  dev:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: telescope-correlator-dev
+    volumes:
+      - .:/workspace
+      - ./dev_workspace/outputs:/app/outputs
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: ["/bin/bash"]
+    environment:
+      - PYTHONPATH=/usr/local/lib/python3.11/site-packages
