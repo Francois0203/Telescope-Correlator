@@ -40,7 +40,7 @@ check_docker() {
 build() {
     log_info "Building Docker image..."
     cd "$PROJECT_ROOT"
-    docker-compose build
+    docker compose build
     log_success "Docker image built successfully"
 }
 
@@ -48,7 +48,7 @@ build() {
 test() {
     log_info "Running tests..."
     cd "$PROJECT_ROOT"
-    docker-compose run --rm test
+    docker compose run --rm test
     log_success "Tests completed"
 }
 
@@ -56,21 +56,21 @@ test() {
 run() {
     log_info "Running correlator..."
     cd "$PROJECT_ROOT"
-    docker-compose run --rm correlator "$@"
+    docker compose run --rm correlator "$@"
 }
 
 # Start development shell
 dev() {
     log_info "Starting development shell..."
     cd "$PROJECT_ROOT"
-    docker-compose run --rm dev
+    docker compose run --rm dev
 }
 
 # Clean up Docker resources
 clean() {
     log_info "Cleaning up Docker resources..."
     cd "$PROJECT_ROOT"
-    docker-compose down -v --rmi local 2>/dev/null || true
+    docker compose down -v --rmi local 2>/dev/null || true
     docker system prune -f
     log_success "Cleanup completed"
 }

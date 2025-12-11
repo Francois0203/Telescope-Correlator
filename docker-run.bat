@@ -12,29 +12,29 @@ goto help
 
 :build
 echo [INFO] Building Docker image...
-docker-compose build
+docker compose build
 echo [SUCCESS] Docker image built successfully
 goto end
 
 :test
 echo [INFO] Running tests...
-docker-compose run --rm test
+docker compose run --rm test
 echo [SUCCESS] Tests completed
 goto end
 
 :run
 echo [INFO] Running correlator...
-docker-compose run --rm correlator python -m correlator %2 %3 %4 %5 %6 %7 %8 %9
+docker compose run --rm correlator python -m correlator %2 %3 %4 %5 %6 %7 %8 %9
 goto end
 
 :dev
 echo [INFO] Starting development shell...
-docker-compose run --rm dev
+docker compose run --rm dev
 goto end
 
 :clean
 echo [INFO] Cleaning up Docker resources...
-docker-compose down -v --rmi local 2>nul
+docker compose down -v --rmi local 2>nul
 docker system prune -f >nul 2>&1
 echo [SUCCESS] Cleanup completed
 goto end

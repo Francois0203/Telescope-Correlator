@@ -23,3 +23,19 @@ Thumbs.db
 
 # Test harness (removable)
 /tests_harness/test_data/
+
+# Output directories and files
+outputs/
+test-outputs/
+ci-test-outputs/
+*.log
+*.npy
+config.yaml
+
+# pytest cache
+.pytest_cache/
+
+# IDE and editor files
+*.swp
+*.swo
+*~

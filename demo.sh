@@ -47,7 +47,7 @@ check_docker() {
 # Clean up any existing containers/images
 cleanup() {
     log_info "Cleaning up previous runs..."
-    docker-compose down -v --rmi local 2>/dev/null || true
+    docker compose down -v --rmi local 2>/dev/null || true
     docker system prune -f >/dev/null 2>&1 || true
     rm -rf demo-outputs test-outputs
     mkdir -p demo-outputs
@@ -56,14 +56,14 @@ cleanup() {
 # Build the Docker image
 build_image() {
     log_info "Building Docker image..."
-    docker-compose build
+    docker compose build
     log_success "Docker image built successfully"
 }
 
 # Run the test suite
 run_tests() {
     log_info "Running test suite..."
-    docker-compose run --rm test
+    docker compose run --rm test
     log_success "All tests passed!"
 }
 
@@ -73,11 +73,11 @@ test_correlator() {
 
     # Run correlator with different configurations
     log_info "Running correlator with 4 antennas..."
-    docker-compose run --rm correlator python -m correlator \
+    docker compose run --rm correlator python -m correlator \
         --n-ants 4 --n-channels 128 --sim-duration 1.0 --output-dir /app/outputs
 
     log_info "Running correlator with 6 antennas..."
-    docker-compose run --rm correlator python -m correlator \
+    docker compose run --rm correlator python -m correlator \
         --n-ants 6 --n-channels 64 --sim-duration 0.5 --output-dir /app/outputs
 
     log_success "Correlator tests completed successfully"
@@ -135,9 +135,9 @@ show_usage() {
     echo "./docker-run.sh dev"
     echo ""
     echo "# Direct Docker commands"
-    echo "docker-compose build"
-    echo "docker-compose run --rm test"
-    echo "docker-compose run --rm correlator python -m correlator --help"
+    echo "docker compose build"
+    echo "docker compose run --rm test"
+    echo "docker compose run --rm correlator python -m correlator --help"
     echo ""
     echo "# Pull from GitHub Container Registry"
     echo "docker pull ghcr.io/francois0203/telescope-correlator:latest"
