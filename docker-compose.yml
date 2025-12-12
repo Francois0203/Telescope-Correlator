@@ -1,6 +1,9 @@
 services:
   # Interactive CLI service - runs continuously
   cli:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
     image: ghcr.io/francois0203/telescope-correlator:latest
     container_name: telescope-correlator-cli
     volumes:
@@ -16,6 +19,9 @@ services:
 
   # One-shot correlator service
   correlator:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
     image: ghcr.io/francois0203/telescope-correlator:latest
     container_name: telescope-correlator
     volumes:
@@ -25,6 +31,9 @@ services:
 
   # Test service for running the test suite
   test:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
     image: ghcr.io/francois0203/telescope-correlator:latest
     container_name: telescope-correlator-test
     volumes:
@@ -37,6 +46,9 @@ services:
 
   # Development service with bash shell
   dev:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
     image: ghcr.io/francois0203/telescope-correlator:latest
     container_name: telescope-correlator-dev
     volumes:
