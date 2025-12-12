@@ -1,0 +1,91 @@
+#!/bin/bash
+# Telescope Correlator - Simple CLI Runner
+# Usage: ./correlator [command] [options]
+
+IMAGE_NAME="telescope-correlator"
+
+# Check if Docker is available
+if ! command -v docker &> /dev/null; then
+    echo "ERROR: Docker is not installed or not in PATH"
+    echo "Please install Docker: https://docs.docker.com/get-docker/"
+    exit 1
+fi
+
+# Get the command (default to interactive)
+CMD="${1:-interactive}"
+
+# Function to check/build image
+check_image() {
+    if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+        echo "Image not found. Building..."
+        docker build -f app/Dockerfile -t "$IMAGE_NAME" . -q
+    fi
+}
+
+# Handle different commands
+case "$CMD" in
+    build)
+        echo "Cleaning up old Docker images..."
+        docker image rm "$IMAGE_NAME" >/dev/null 2>&1
+        docker image prune -f >/dev/null 2>&1
+        echo ""
+        echo "Building Telescope Correlator..."
+        docker build -f app/Dockerfile -t "$IMAGE_NAME" .
+        if [ $? -eq 0 ]; then
+            echo ""
+            echo "✓ Build successful!"
+            echo "Run './correlator' to start the CLI"
+        fi
+        ;;
+    
+    interactive)
+        check_image
+        echo "Starting Interactive CLI..."
+        echo ""
+        docker run -it --rm -v "$(pwd)/dev_workspace/outputs:/app/outputs" "$IMAGE_NAME" python -m correlator --interactive
+        ;;
+    
+    run)
+        check_image
+        shift  # Remove 'run' from arguments
+        echo "Running correlator..."
+        docker run --rm -v "$(pwd)/dev_workspace/outputs:/app/outputs" "$IMAGE_NAME" correlator "$@"
+        ;;
+    
+    test)
+        check_image
+        echo "Running tests..."
+        docker run --rm -v "$(pwd):/workspace" -e PYTHONPATH=/workspace/app/src:/usr/local/lib/python3.11/site-packages -w /workspace "$IMAGE_NAME" pytest tests_harness/ -v
+        ;;
+    
+    help|-h|--help)
+        cat << EOF
+Telescope Correlator CLI
+
+Usage: ./correlator [COMMAND] [OPTIONS]
+
+Commands:
+  ./correlator                    Start interactive CLI (default)
+  ./correlator build              Build the Docker image
+  ./correlator run [OPTIONS]      Run correlator with parameters
+  ./correlator test               Run test suite
+  ./correlator help               Show this help
+
+Examples:
+  ./correlator                                             Start interactive CLI
+  ./correlator build                                       Build Docker image
+  ./correlator run --n-ants 4 --n-channels 64              Run with parameters
+  ./correlator run --sim-duration 2.0 --output-dir outputs Custom run
+  ./correlator test                                        Run all tests
+
+For more options in run mode, use: ./correlator run --help
+EOF
+        ;;
+    
+    *)
+        echo "Unknown command: $CMD"
+        echo ""
+        ./correlator help
+        exit 1
+        ;;
+esac

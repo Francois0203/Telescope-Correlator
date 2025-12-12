@@ -1,119 +1,101 @@
 # Telescope Correlator
 
-A complete radio telescope correlator implementation with FX architecture, fully containerized with an interactive CLI for easy deployment and testing.
+A radio telescope correlator implementing the FX architecture for array signal processing.
 
-## 🚀 Quick Start
+## Quick Start
 
-### Interactive CLI (Recommended)
+**Windows:**
+```cmd
+correlator
+```
 
-Start a persistent interactive shell for repeated correlator runs:
-
+**Linux/Mac:**
 ```bash
-# Windows
-.\docker-run.bat cli
-
-# Linux/macOS  
-./docker-run.sh cli
+chmod +x correlator
+./correlator
 ```
 
-Inside the CLI shell:
+This automatically builds and starts the interactive CLI.
+
+## Commands
+
+```cmd
+correlator                     # Start interactive CLI (default)
+correlator build               # Build Docker image
+correlator run [OPTIONS]       # Run with parameters
+correlator test                # Run test suite
+correlator help                # Show help
 ```
-correlator> run --n-ants 4 --n-channels 256 --sim-duration 1.0
-correlator> config
-correlator> status
-correlator> help
+
+## Interactive CLI Commands
+
+Inside the CLI (`correlator`):
+
+```
+run                           # Execute correlator
+run --n-ants 8 --sim-duration 2.0  # Run with custom parameters
+set n_ants 8                  # Change number of antennas
+set n_channels 256            # Change frequency channels
+set sim_duration 2.0          # Change simulation time
+config                        # View all settings
+list                          # List output files
+list *.npy                    # List specific files
+visualize                     # Create plots from latest output
+visualize visibility_0001     # Visualize specific file
+help                          # Show all commands
+exit                          # Exit CLI
 ```
 
-**See [CLI_GUIDE.md](CLI_GUIDE.md) for complete interactive CLI documentation.**
+## Common Parameters
 
-### One-Shot Execution
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `--n-ants` | Number of antennas | 4 |
+| `--n-channels` | Frequency channels | 256 |
+| `--sim-duration` | Simulation time (seconds) | 10.0 |
+| `--sim-snr` | Signal-to-noise ratio (dB) | 20.0 |
+| `--sample-rate` | Sample rate (Hz) | 1024.0 |
+| `--output-dir` | Output directory | /app/outputs |
 
-For single batch runs:
+## Quick Examples
 
-```bash
-# Pull the published image
-docker pull ghcr.io/francois0203/telescope-correlator:latest
+```cmd
+# Start interactive CLI
+correlator
 
-# Run the correlator
-docker compose run --rm correlator python -m correlator --n-ants 4 --n-channels 128 --sim-duration 1.0 --output-dir /app/outputs
+# Direct run with parameters
+correlator run --n-ants 4 --n-channels 64
+correlator run --n-ants 8 --n-channels 512 --sim-duration 2.0
 
 # Run tests
-docker compose run --rm test
+correlator test
 ```
 
-**See [DOCKER_README.md](DOCKER_README.md) for complete Docker usage instructions.**
+## Output Files
 
-## 📋 Project Status
+Results in `dev_workspace/outputs/`:
+- `visibility_*.npy` - Correlation data
+- `config.yaml` - Configuration
+- `*_visualization.png` - Plots
 
-✅ **Fully Implemented & Containerized**
-- Complete FX correlator with F-engine, X-engine, and delay compensation
-- Comprehensive test suite (33 tests passing)
-- Automated CI/CD with GitHub Actions
-- Published Docker images on GHCR
-- Cross-platform support (Linux AMD64/ARM64)
+## Requirements
 
-## 🏗️ Architecture
+- Docker Desktop (Windows/Mac) or Docker Engine (Linux)
+- 2GB+ disk space
+- No Python installation needed
 
-The correlator implements a complete FX architecture:
+## Architecture
 
-1. **Frontend**: Data ingestion with simulated or file-based sources
-2. **F-Engine**: FFT-based channelization with configurable windowing
-3. **Delay Engine**: Geometric delay compensation for antenna arrays
-4. **X-Engine**: Cross-correlation with integration and accumulation
+**FX Correlator Pipeline:**
+1. Frontend → Data ingestion
+2. F-Engine → FFT channelization
+3. Delay Engine → Geometric compensation
+4. X-Engine → Cross-correlation
 
-### Key Features
+**Features:**
+- Multi-antenna arrays (2-32+ antennas)
+- Configurable channels (32-1024+)
+- Built-in visualization
+- Real-time processing
 
-- **Multi-antenna correlation**: Supports N-antenna arrays with all baselines
-- **Wideband processing**: Configurable frequency channels (32-1024+)
-- **Real-time capable**: Optimized for streaming data processing
-- **Signal validation**: Built-in SNR simulation and signal quality metrics
-
-## 📊 Usage Examples
-
-```bash
-# Basic 4-antenna correlator
-docker compose run --rm correlator python -m correlator --n-ants 4 --n-channels 128 --sim-duration 1.0
-
-# High-resolution observation
-docker compose run --rm correlator python -m correlator --n-ants 8 --n-channels 512 --sim-duration 2.0
-
-# Development shell
-docker compose run --rm dev
-```
-
-## 📁 Project Structure
-
-```
-telescope-correlator/
-├── app/src/correlator/       # Core correlator implementation
-│   ├── core/                 # Signal processing modules
-│   ├── cli/                  # Interactive CLI and commands
-│   ├── utils/                # Utility functions
-│   └── config.py             # Configuration management
-├── tests_harness/            # Complete test suite
-├── dev_workspace/outputs/    # Generated results (gitignored)
-├── docker-compose.yml        # Docker services configuration
-├── docker-run.sh/.bat        # Cross-platform management scripts
-├── CLI_GUIDE.md              # Interactive CLI documentation
-├── DOCKER_README.md          # Complete Docker usage guide
-└── visualize_*.py           # Result visualization tools
-```
-
-## 🔧 Development
-
-- **Language**: Python 3.11 with scientific computing stack
-- **Testing**: pytest with 33 comprehensive tests
-- **Containerization**: Multi-stage Docker builds
-- **CI/CD**: GitHub Actions with automated publishing
-- **Registry**: GitHub Container Registry (ghcr.io)
-
-## 📖 Documentation
-
-- **[CLI_GUIDE.md](CLI_GUIDE.md)** - Interactive CLI shell documentation (START HERE!)
-- **[DOCKER_README.md](DOCKER_README.md)** - Complete Docker usage guide
-- **[USAGE_GUIDE.md](USAGE_GUIDE.md)** - Detailed correlator usage and parameters
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical architecture documentation
-
-## 🤝 Contributing
-
-See [DOCKER_README.md](DOCKER_README.md) for contribution guidelines. Images are automatically built and published via CI/CD when changes are pushed to `main`.
+See [QUICKSTART.md](QUICKSTART.md) for more examples.

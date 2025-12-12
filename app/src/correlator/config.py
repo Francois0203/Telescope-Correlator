@@ -53,7 +53,7 @@ class CorrelatorConfig:
     phase_center: list[float] = field(default_factory=lambda: [1.0, 0.0, 0.0])  # Unit vector
     
     # Output
-    output_dir: str = "../dev_workspace/outputs"
+    output_dir: str = "/app/outputs"
     save_channelised: bool = False  # Save intermediate F-engine output
     save_visibilities: bool = True
     

@@ -1,40 +1,24 @@
 services:
-  # Interactive CLI service - runs continuously
-  cli:
-    build:
-      context: .
-      dockerfile: app/Dockerfile
-    image: ghcr.io/francois0203/telescope-correlator:latest
-    container_name: telescope-correlator-cli
-    volumes:
-      - ./dev_workspace/outputs:/app/outputs
-      - .:/workspace
-    working_dir: /app
-    stdin_open: true
-    tty: true
-    command: ["python", "-m", "correlator", "--interactive"]
-    environment:
-      - PYTHONPATH=/usr/local/lib/python3.11/site-packages
-    restart: unless-stopped
-
-  # One-shot correlator service
+  # Interactive CLI service
   correlator:
     build:
       context: .
       dockerfile: app/Dockerfile
-    image: ghcr.io/francois0203/telescope-correlator:latest
+    image: telescope-correlator:latest
     container_name: telescope-correlator
     volumes:
       - ./dev_workspace/outputs:/app/outputs
     working_dir: /app
-    command: ["python", "-m", "correlator", "--help"]
+    stdin_open: true
+    tty: true
+    command: ["python", "-m", "correlator", "--interactive"]
 
-  # Test service for running the test suite
+  # Test service
   test:
     build:
       context: .
       dockerfile: app/Dockerfile
-    image: ghcr.io/francois0203/telescope-correlator:latest
+    image: telescope-correlator:latest
     container_name: telescope-correlator-test
     volumes:
       - .:/workspace
@@ -43,20 +27,3 @@ services:
     command: ["pytest", "tests_harness/", "-v", "--tb=short"]
     environment:
       - PYTHONPATH=/workspace/app/src:/usr/local/lib/python3.11/site-packages
-
-  # Development service with bash shell
-  dev:
-    build:
-      context: .
-      dockerfile: app/Dockerfile
-    image: ghcr.io/francois0203/telescope-correlator:latest
-    container_name: telescope-correlator-dev
-    volumes:
-      - .:/workspace
-      - ./dev_workspace/outputs:/app/outputs
-    working_dir: /workspace
-    stdin_open: true
-    tty: true
-    command: ["/bin/bash"]
-    environment:
-      - PYTHONPATH=/usr/local/lib/python3.11/site-packages
