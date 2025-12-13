@@ -56,11 +56,14 @@ class DelayEngine:
         
         Args:
             ant_positions: Antenna positions shape (n_ants, 2 or 3)
-            reference_freq: Reference frequency for delay calculation
+            reference_freq: Reference frequency in Hz
         """
         self.ant_positions = ant_positions
         self.n_ants = ant_positions.shape[0]
         self.reference_freq = reference_freq
+        
+        # Speed of light for wavelength calculation
+        self.c = 3e8  # m/s
         
         # Current phase tracking state
         self.current_delays = np.zeros(self.n_ants)
@@ -75,10 +78,11 @@ class DelayEngine:
         self.phase_center = direction / np.linalg.norm(direction)
         
         # Recompute delays
+        wavelength = self.c / self.reference_freq  # Wavelength in meters
         self.current_delays = calculate_geometric_delays(
             self.ant_positions,
             self.phase_center,
-            wavelength=1.0 / self.reference_freq
+            wavelength=wavelength
         )
     
     def apply_delays(
