@@ -1,0 +1,63 @@
+# Production Mode Configuration
+# For real telescope data processing
+
+# Operation mode
+operation_mode: production
+data_source: network_stream  # or 'file' for recorded data
+
+# Network streaming configuration
+stream_protocol: tcp  # tcp, udp, or spead
+stream_address: localhost:7148  # antenna server address
+stream_buffer_size: 10485760  # 10 MB
+stream_timeout: 5.0  # seconds
+
+# Array configuration
+n_ants: 64  # Actual array size
+ant_radius: 100.0  # meters (if using circular array)
+# ant_positions: [[x1,y1], [x2,y2], ...]  # Or specify exact positions
+
+# Signal parameters
+sample_rate: 2048000.0  # 2.048 MHz (realistic for radio telescopes)
+center_freq: 1420405751.77  # 1.420 GHz (HI line, precise)
+
+# F-engine (channelization)
+n_channels: 4096  # High resolution for production
+window_type: hanning
+quantize_bits: 8  # 8-bit quantization to save bandwidth
+overlap_factor: 0.25  # 25% overlap for better frequency response
+
+# X-engine (correlation)
+integration_time: 1.0  # seconds
+
+# Delay compensation
+enable_delays: true
+phase_center: [0.0, 0.7071, 0.7071]  # Pointing direction (unit vector)
+
+# Output configuration
+output_dir: /workspace/outputs/prod
+save_channelised: false
+save_visibilities: true
+output_format: hdf5  # HDF5 for production data
+
+# Runtime parameters
+chunk_size: 8192  # Larger chunks for production
+max_integrations: null  # Process continuously
+
+# Production features
+enable_monitoring: true  # Real-time performance monitoring
+enable_logging: true
+log_level: INFO
+log_file: /workspace/logs/correlator.log
+enable_quality_checks: true  # Data quality validation
+enable_rfi_detection: true  # RFI flagging
+
+# Calibration
+calibration_file: /workspace/calibration/default_cal.yaml
+apply_bandpass_cal: true
+apply_phase_cal: true
+apply_delay_cal: false
+
+# Performance tuning
+# buffer_management: auto
+# numa_aware: true  # For multi-socket systems
+# thread_affinity: true

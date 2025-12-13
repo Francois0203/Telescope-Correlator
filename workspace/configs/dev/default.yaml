@@ -1,0 +1,48 @@
+# Development Mode Configuration
+# For simulations, testing, and learning
+
+# Operation mode
+operation_mode: development
+data_source: simulated
+
+# Array configuration
+n_ants: 8
+ant_radius: 10.0  # meters
+
+# Signal parameters
+sample_rate: 1024.0  # Hz
+center_freq: 1420000000.0  # 1.42 GHz (HI line)
+
+# F-engine (channelization)
+n_channels: 256
+window_type: hanning
+quantize_bits: 0  # No quantization in dev mode
+overlap_factor: 0.0
+
+# X-engine (correlation)
+integration_time: 1.0  # seconds
+
+# Simulation parameters
+sim_duration: 10.0  # seconds
+sim_snr: 20.0  # dB
+sim_realtime: false
+sim_source_angles: [0.0, 0.5236]  # radians
+
+# Delay compensation
+enable_delays: true
+phase_center: [1.0, 0.0, 0.0]
+
+# Output
+output_dir: /workspace/outputs/dev
+save_channelised: false
+save_visibilities: true
+output_format: npy
+
+# Runtime
+chunk_size: 4096
+max_integrations: null  # Run until simulation completes
+
+# Logging (minimal in dev mode)
+enable_logging: true
+log_level: INFO
+enable_monitoring: false

@@ -2,6 +2,7 @@
 
 Handles correlator configuration with sensible defaults and validation.
 Supports loading from YAML files or programmatic configuration.
+Supports both development (simulation) and production (real telescope) modes.
 """
 from __future__ import annotations
 
@@ -13,53 +14,85 @@ import numpy as np
 
 
 WindowType = Literal["rectangular", "hanning", "hamming", "blackman"]
+OperationMode = Literal["development", "production"]
+DataSource = Literal["simulated", "file", "network_stream", "message_queue"]
+StreamProtocol = Literal["tcp", "udp", "spead", "zeromq"]
 
 
 @dataclass
 class CorrelatorConfig:
-    """Complete correlator configuration."""
+    """Complete correlator configuration.
+    
+    Supports two operation modes:
+    - development: For simulations, testing, and learning
+    - production: For real telescope data processing
+    """
+    
+    # Operation mode (fundamental setting)
+    operation_mode: OperationMode = "development"
     
     # Array configuration
     n_ants: int = 4
     ant_positions: Optional[np.ndarray] = None  # If None, use uniform circle
-    ant_radius: float = 10.0  # For auto-generated positions
+    ant_radius: float = 10.0  # For auto-generated positions (meters)
     
     # Signal parameters
-    sample_rate: float = 1024.0  # Hz
-    center_freq: float = 1.0  # Hz (arbitrary units)
+    sample_rate: float = 1024.0  # Hz (samples per second)
+    center_freq: float = 1.42e9  # Hz (1.42 GHz - HI line, realistic default)
     
     # F-engine (channeliser)
     n_channels: int = 256
     window_type: WindowType = "hanning"
-    quantize_bits: int = 0  # 0 = no quantization
-    overlap_factor: float = 0.0  # 0.0 to 0.5
+    quantize_bits: int = 0  # 0 = no quantization, 8/16 for real systems
+    overlap_factor: float = 0.0  # 0.0 to 0.5 (0.5 = 50% overlap)
     
     # X-engine (correlator)
-    integration_time: float = 1.0  # seconds
+    integration_time: float = 1.0  # seconds per integration
     
     # Data source
-    mode: Literal["simulated", "file"] = "simulated"
-    input_file: Optional[str] = None  # For file mode
+    data_source: DataSource = "simulated"
+    input_file: Optional[str] = None  # For file-based processing
     
-    # Simulation parameters (when mode="simulated")
+    # Network streaming (production mode)
+    stream_protocol: StreamProtocol = "tcp"
+    stream_address: str = "localhost:7148"  # host:port
+    stream_buffer_size: int = 10485760  # 10 MB buffer
+    stream_timeout: float = 5.0  # seconds
+    
+    # Simulation parameters (development mode only)
     sim_source_angles: list[float] = field(default_factory=lambda: [0.0, np.pi/6])
-    sim_freq: float = 1.0
-    sim_snr: float = 20.0
+    sim_freq: float = 1.0  # Arbitrary units for simulation
+    sim_snr: float = 20.0  # dB
     sim_duration: float = 10.0  # seconds
-    sim_realtime: bool = False  # Simulate real-time streaming
+    sim_realtime: bool = False  # Simulate real-time streaming delays
     
     # Delay compensation
     enable_delays: bool = True
     phase_center: list[float] = field(default_factory=lambda: [1.0, 0.0, 0.0])  # Unit vector
     
-    # Output
-    output_dir: str = "/app/outputs"
+    # Output configuration
+    output_dir: str = "/workspace/outputs"
     save_channelised: bool = False  # Save intermediate F-engine output
     save_visibilities: bool = True
+    output_format: Literal["npy", "hdf5", "fits"] = "npy"
     
-    # Runtime
+    # Runtime parameters
     chunk_size: int = 4096  # Samples per processing chunk
     max_integrations: Optional[int] = None  # None = run until data exhausted
+    
+    # Production features
+    enable_monitoring: bool = False  # Real-time performance monitoring
+    enable_logging: bool = True  # Structured logging
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    log_file: Optional[str] = None  # None = stdout only
+    enable_quality_checks: bool = False  # Data quality validation
+    enable_rfi_detection: bool = False  # Radio Frequency Interference detection
+    
+    # Calibration (production mode)
+    calibration_file: Optional[str] = None  # Path to calibration data
+    apply_bandpass_cal: bool = False
+    apply_phase_cal: bool = False
+    apply_delay_cal: bool = False
     
     def __post_init__(self):
         """Validate and normalize configuration."""
@@ -72,8 +105,31 @@ class CorrelatorConfig:
         if self.integration_time <= 0:
             raise ValueError("integration_time must be positive")
         
-        if self.mode == "file" and self.input_file is None:
-            raise ValueError("input_file must be specified when mode='file'")
+        # Validate data source requirements
+        if self.data_source == "file" and self.input_file is None:
+            raise ValueError("input_file must be specified when data_source='file'")
+        
+        if self.data_source == "network_stream" and not self.stream_address:
+            raise ValueError("stream_address must be specified for network streaming")
+        
+        # Production mode validations
+        if self.operation_mode == "production":
+            if self.data_source == "simulated":
+                raise ValueError("Production mode cannot use simulated data source")
+            
+            # Enable production features by default
+            if self.enable_monitoring is False:
+                self.enable_monitoring = True
+            if self.enable_quality_checks is False:
+                self.enable_quality_checks = True
+    
+    def is_development_mode(self) -> bool:
+        """Check if running in development mode."""
+        return self.operation_mode == "development"
+    
+    def is_production_mode(self) -> bool:
+        """Check if running in production mode."""
+        return self.operation_mode == "production"
     
     @classmethod
     def from_yaml(cls, path: str | Path) -> "CorrelatorConfig":
