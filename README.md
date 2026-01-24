@@ -1,66 +1,93 @@
-# Telescope Correlator
+# Telescope Correlator - FX Architecture
 
-**Production-ready FX correlator for radio telescope arrays**
-
-A professional-grade telescope correlator implementing the FX architecture for processing radio telescope data. Supports both development (simulation) and production (real telescope) operation modes.
-
----
+A production-ready software correlator for radio telescope arrays implementing the FX (Fourier Transform-Cross Multiply) architecture. This correlator processes time-domain antenna signals to produce calibrated visibility measurements used in radio astronomy imaging.
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Features](#features)
 - [Quick Start](#quick-start)
-- [How It Works](#how-it-works)
-- [Repository Structure](#repository-structure)
-- [Development Mode](#development-mode)
-- [Production Mode](#production-mode)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Development Mode](#development-mode)
+  - [Production Mode](#production-mode)
+  - [File-Based Processing](#file-based-processing)
 - [Configuration](#configuration)
-- [Running Tests](#running-tests)
-- [Docker Details](#docker-details)
-- [Data Formats](#data-formats)
+- [Output Data](#output-data)
+- [Testing](#testing)
+- [Examples](#examples)
 - [Troubleshooting](#troubleshooting)
-- [Advanced Usage](#advanced-usage)
-
----
+- [System Requirements](#system-requirements)
 
 ## Overview
 
-This correlator processes voltage streams from radio telescope antenna arrays and produces visibility data suitable for astronomical image synthesis. It implements the industry-standard **FX architecture**:
+The Telescope Correlator is a Python-based implementation of an FX correlator designed for radio telescope arrays. It converts time-domain signals from multiple antennas into frequency-domain visibilities, which are the fundamental measurements in radio interferometry.
 
-- **F-Engine**: Channelization via windowed FFT (converts time-domain signals to frequency domain)
-- **X-Engine**: Cross-correlation and integration (correlates signals between antenna pairs)
-- **Delay Compensation**: Geometric phase correction (accounts for array geometry and source position)
+### What is an FX Correlator?
 
-### Key Features
+An FX correlator processes antenna signals in two stages:
+- **F-Engine (Fourier Transform)**: Converts time-domain signals into frequency channels using windowed FFT
+- **X-Engine (Cross-Multiply)**: Computes cross-correlations between antenna pairs to produce visibilities
 
-✅ **Dual-Mode Operation** - Separate development (simulation) and production (real telescopes) modes  
-✅ **Network Streaming** - TCP/UDP protocols for live telescope data  
-✅ **Real-Time Monitoring** - Performance metrics and data quality checks  
-✅ **Calibration Ready** - Framework for bandpass, phase, and delay calibration  
-✅ **Industry Standard** - Production-ready for real telescope arrays  
-✅ **Easy to Use** - Intuitive CLI with comprehensive help  
-✅ **Containerized** - Docker-based for portability and reproducibility  
-✅ **Tested** - 33 comprehensive tests covering all components  
+This architecture is efficient for wide-field imaging and is used in many modern radio telescopes.
 
----
+## Features
+
+### Core Capabilities
+- ✅ **Dual Operation Modes**: Development (simulation) and Production (real data)
+- ✅ **FX Pipeline**: Complete F-engine channelization and X-engine correlation
+- ✅ **Geometric Delay Compensation**: Corrects for antenna position differences
+- ✅ **Flexible Data Sources**: Simulated, file-based, and network streaming
+- ✅ **Multiple Window Functions**: Hanning, Hamming, Blackman, Rectangular
+- ✅ **Configurable Parameters**: FFT size, integration time, overlap, quantization
+- ✅ **Multiple Output Formats**: NumPy (.npy), HDF5 (.h5), FITS (.fits)
+
+### Advanced Features
+- 🔧 **Quantization Emulation**: 8/16-bit quantization for realistic system modeling
+- 🔧 **Polyphase Filterbank Mode**: Overlapping FFT windows for improved frequency response
+- 🔧 **Real-time Simulation**: Time-synchronized data generation
+- 🔧 **Batch Processing**: Process pre-recorded data files
+- 🔧 **Docker Support**: Containerized deployment for reproducibility
 
 ## Quick Start
 
-### Prerequisites
+### Using Docker (Recommended)
 
-- **Docker Desktop** ([Download](https://www.docker.com/products/docker-desktop))
-- **Windows, Linux, or macOS**
-- At least 4GB RAM available for Docker
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/telescope-correlator.git
+cd telescope-correlator
 
-### Installation
+# Build the Docker image
+correlator.bat build     # Windows
+# or
+./correlator build       # Linux/Mac
 
-1. Clone this repository:
-   ```bash
-   git clone <repository-url>
-   cd Telescope-Correlator
-   ```
+# Start interactive development mode
+correlator.bat dev       # Windows
+# or
+./correlator dev         # Linux/Mac
+```
 
-2. Build the Docker container:
+### Quick Test Run
+
+```bash
+# Run a quick simulation with 4 antennas
+correlator.bat dev run --n-ants 4 --sim-duration 5.0
+
+# Check the output
+ls workspace/outputs/
+```
+
+## Installation
+
+### Docker Installation (Recommended)
+
+1. **Install Docker Desktop**
+   - Windows/Mac: [Docker Desktop](https://www.docker.com/products/docker-desktop)
+   - Linux: [Docker Engine](https://docs.docker.com/engine/install/)
+
+2. **Build the Correlator Image**
    ```bash
    # Windows
    correlator.bat build
@@ -69,1066 +96,595 @@ This correlator processes voltage streams from radio telescope antenna arrays an
    ./correlator build
    ```
 
-3. Start using it:
+3. **Verify Installation**
    ```bash
-   # Development mode (simulations)
-   correlator dev
-   
-   # Production mode (real telescopes)
-   correlator prod
+   correlator.bat dev --help
    ```
 
-### First Run (Development Mode)
+### Native Python Installation
+
+If you prefer to run without Docker:
 
 ```bash
-# Start interactive development CLI
-correlator dev
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or
+venv\Scripts\activate     # Windows
 
-# Inside the CLI, run a simulation:
-dev> run --n-ants 4 --n-channels 64 --sim-duration 2.0
-dev> list
-dev> visualize
-dev> exit
+# Install dependencies
+pip install -r requirements.txt
+
+# Install the package
+pip install -e app/src/
+
+# Run correlator
+python -m correlator dev --help
 ```
 
-### Your First Test
+**Requirements:**
+- Python 3.11+
+- NumPy >= 1.25
+- SciPy >= 1.11
+- PyYAML >= 6.0
+- h5py >= 3.10 (for HDF5 output)
+- astropy >= 6.0 (for FITS output)
+
+## Usage
+
+The correlator has two primary operation modes:
+
+### Development Mode
+
+Development mode is for simulations, testing, and learning. It generates synthetic antenna signals and is perfect for algorithm development.
+
+#### Interactive CLI
 
 ```bash
-# Run all tests to verify installation
-correlator test
-
-# Expected output: 33 tests passed
+correlator.bat dev
 ```
 
----
+This starts an interactive shell where you can:
+- Configure parameters interactively
+- Run simulations
+- Inspect results
+- Iterate quickly
 
-## How It Works
-
-### Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   TELESCOPE CORRELATOR                      │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌──────────────┐              ┌──────────────┐           │
-│  │   DEV MODE   │              │  PROD MODE   │           │
-│  │              │              │              │           │
-│  │ • Simulated  │              │ • Live Stream│           │
-│  │   Data       │              │ • File Input │           │
-│  │ • Testing    │              │ • Monitoring │           │
-│  └──────┬───────┘              └──────┬───────┘           │
-│         │                             │                    │
-│         └──────────┬──────────────────┘                    │
-│                    │                                        │
-│         ┌──────────▼───────────┐                          │
-│         │   CORRELATOR ENGINE  │                          │
-│         │                      │                          │
-│         │  • F-Engine (FFT)    │                          │
-│         │  • X-Engine (Corr)   │                          │
-│         │  • Delay Comp        │                          │
-│         └──────────┬───────────┘                          │
-│                    │                                        │
-│         ┌──────────▼───────────┐                          │
-│         │   OUTPUT MANAGER     │                          │
-│         │                      │                          │
-│         │  • Visibility Data   │                          │
-│         │  • Metadata          │                          │
-│         │  • Quality Metrics   │                          │
-│         └──────────────────────┘                          │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Processing Pipeline
-
-**Development Mode Flow:**
-```
-Simulator → F-Engine → X-Engine → Visibilities → Plots
-```
-
-**Production Mode Flow:**
-```
-Telescope → Network/File → Quality Check → F-Engine → 
-X-Engine → Calibration → Visibilities → Archive
-                ↓
-            Monitoring & Logging
-```
-
-### What Happens When You Run a Correlation
-
-1. **Data Ingestion**: 
-   - Dev: Generates simulated telescope signals
-   - Prod: Receives live network stream or reads files
-
-2. **F-Engine (Channelization)**:
-   - Applies window function (Hanning, Hamming, etc.)
-   - Performs FFT to convert time → frequency domain
-   - Optional quantization for bandwidth reduction
-   - Outputs channelized spectra
-
-3. **Delay Compensation**:
-   - Calculates geometric delays based on antenna positions
-   - Applies phase corrections to align signals
-   - Accounts for source position and array geometry
-
-4. **X-Engine (Correlation)**:
-   - Cross-correlates all antenna pairs (baselines)
-   - Accumulates over integration time
-   - Produces complex visibilities per channel
-
-5. **Output**:
-   - Saves visibility data (`.npy`, `.hdf5`, or `.fits`)
-   - Saves configuration for reproducibility
-   - Generates plots (dev mode)
-   - Logs statistics and quality metrics (prod mode)
-
----
-
-## Repository Structure
-
-```
-Telescope-Correlator/
-│
-├── app/                        # Correlator Engine (Docker container)
-│   ├── Dockerfile              # Container definition
-│   └── src/correlator/         # Python package
-│       ├── __init__.py
-│       ├── __main__.py         # CLI entry point
-│       ├── config.py           # Configuration system
-│       │
-│       ├── core/               # Processing engines
-│       │   ├── frontend.py     # Data ingestion (simulator, file, stream)
-│       │   ├── fengine.py      # Channelization (FFT)
-│       │   ├── xengine.py      # Cross-correlation
-│       │   └── delay.py        # Geometric delay compensation
-│       │
-│       ├── cli/                # Command-line interfaces
-│       │   ├── dev.py          # Development mode CLI
-│       │   ├── prod.py         # Production mode CLI
-│       │   ├── commands.py     # Command parser
-│       │   ├── interactive.py  # Interactive shell
-│       │   └── runner.py       # Pipeline runner
-│       │
-│       └── streaming/          # Network streaming (production)
-│           └── __init__.py     # TCP/UDP/SPEAD protocols
-│
-├── workspace/                  # User Workspace (mounted to container)
-│   ├── configs/                # Configuration files
-│   │   ├── dev/                # Development configurations
-│   │   │   └── default.yaml    # Default dev config
-│   │   └── prod/               # Production configurations
-│   │       └── default.yaml    # Default prod config
-│   │
-│   ├── outputs/                # Processed visibility data
-│   ├── inputs/                 # Raw telescope data (for file processing)
-│   ├── logs/                   # Processing logs
-│   └── calibration/            # Calibration files
-│
-├── tests_harness/              # Test Suite
-│   ├── unit/                   # Unit tests (F-engine, X-engine, etc.)
-│   ├── integration/            # Integration tests (end-to-end pipeline)
-│   └── generators/             # Test data generators
-│
-├── correlator.bat              # CLI Launcher (Windows)
-├── correlator                  # CLI Launcher (Linux/Mac)
-├── docker-compose.yml          # Docker orchestration
-├── requirements.txt            # Python dependencies
-│
-└── Documentation/
-    ├── README.md               # This file
-    ├── ARCHITECTURE.md         # Detailed system design
-    ├── QUICKSTART.md           # Quick reference
-    └── PRODUCTION_READY_SUMMARY.md  # Implementation details
-```
-
-### Key Components
-
-**`app/`** - Contains the correlator engine that runs inside Docker. This is the core processing code.
-
-**`workspace/`** - Your working directory. All your configs, data, and outputs live here. This directory is mounted into the Docker container at `/workspace`.
-
-**`tests_harness/`** - Complete test suite with 33 tests covering all functionality.
-
-**`correlator.bat` / `correlator`** - CLI launcher scripts that manage Docker and route commands to the appropriate mode.
-
----
-
-## Development Mode
-
-**Purpose**: Testing, learning, algorithm development, and validation. Uses simulated telescope data for safe experimentation.
-
-### When to Use Development Mode
-
-- Learning how telescope correlators work
-- Testing new algorithms or parameters
-- Validating pipeline changes
-- Running automated tests
-- Generating example data
-- Creating visualizations
-- No telescope hardware available
-
-### Starting Development Mode
+#### Command-Line Execution
 
 ```bash
-# Interactive CLI
-correlator dev
+# Basic simulation with default parameters
+correlator.bat dev run
 
-# Direct commands
-correlator dev run --n-ants 8 --n-channels 256
-correlator dev test
+# Custom configuration
+correlator.bat dev run --n-ants 8 --n-channels 512 --integration-time 2.0
+
+# With specific output directory
+correlator.bat dev run --output-dir workspace/outputs/test1
+
+# Longer simulation
+correlator.bat dev run --sim-duration 30.0 --max-integrations 10
 ```
 
-### Development CLI Commands
+#### Common Development Parameters
 
-Once in the dev CLI (`correlator dev`), you have these commands:
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `--n-ants` | Number of antennas | 4 |
+| `--n-channels` | FFT size (power of 2) | 256 |
+| `--sample-rate` | Sample rate (Hz) | 1024.0 |
+| `--integration-time` | Integration period (sec) | 1.0 |
+| `--sim-duration` | Simulation length (sec) | 10.0 |
+| `--sim-snr` | Signal SNR (dB) | 20.0 |
+| `--window-type` | Window function | hanning |
+| `--output-dir` | Output directory | /workspace/outputs |
 
-```
-run              Run simulation with specified parameters
-config           View/edit development configuration
-visualize        Create plots from simulation results
-test             Run validation test suite
-generate         Generate example data files
-list             Show output files
-status           System status
-help             Show command help
-exit             Exit CLI
-```
+### Production Mode
 
-### Development Mode Examples
+Production mode processes real telescope data from files or network streams.
 
-**Basic Simulation:**
-```bash
-correlator dev
-
-dev> run --n-ants 4 --n-channels 64 --sim-duration 2.0
-dev> list
-dev> visualize
-```
-
-**Custom Simulation:**
-```bash
-dev> run --n-ants 8 \
-         --n-channels 512 \
-         --sim-duration 5.0 \
-         --sim-snr 15 \
-         --integration-time 1.0
-```
-
-**Interactive Parameter Adjustment:**
-```bash
-dev> config
-dev> set n_ants 16
-dev> set n_channels 1024
-dev> set sim_duration 10.0
-dev> run
-```
-
-**Visualization:**
-```bash
-dev> visualize                    # Choose file interactively
-dev> visualize visibility_0001    # Specific file
-dev> list *.png                   # Show plots
-```
-
-### Development Configuration
-
-Configuration file: `workspace/configs/dev/default.yaml`
-
-```yaml
-operation_mode: development
-data_source: simulated
-
-# Array setup
-n_ants: 8
-n_channels: 256
-
-# Simulation parameters
-sim_duration: 10.0      # seconds
-sim_snr: 20.0           # dB
-sim_realtime: false
-
-# Processing
-integration_time: 1.0   # seconds
-window_type: hanning
-
-# Output
-output_dir: /workspace/outputs/dev
-```
-
----
-
-## Production Mode
-
-**Purpose**: Processing real telescope data from live streams or recorded observations. For actual astronomical research.
-
-### When to Use Production Mode
-
-- Processing real telescope observations
-- Live streaming from antenna arrays
-- Batch processing recorded data
-- Applying calibration
-- Monitoring data quality
-- Production observations
-- Publishing research results
-
-### Starting Production Mode
+#### Interactive CLI
 
 ```bash
-# Interactive CLI (requires confirmation)
-correlator prod
-
-# Direct commands
-correlator prod stream --source tcp://antenna:7148
-correlator prod process --input-dir workspace/inputs/
+correlator.bat prod
 ```
 
-### Production CLI Commands
+#### Streaming from Network
 
-Once in the prod CLI (`correlator prod`), you have these commands:
-
-```
-stream           Start live data streaming from telescopes
-process          Process recorded data files
-monitor          Display real-time processing statistics
-calibrate        Run calibration pipeline
-status           System health check
-config           View/edit production configuration
-help             Show command help
-exit             Exit CLI (with safety checks)
-```
-
-### Production Mode Examples
-
-**Live Streaming:**
 ```bash
-correlator prod
+# TCP streaming
+correlator.bat prod stream --source tcp://10.0.0.1:7148
 
-prod> stream --source tcp://10.0.0.1:7148 \
-             --protocol tcp \
-             --integration 1.0 \
-             --buffer-size 100
+# With custom configuration
+correlator.bat prod stream --source tcp://antenna-server:7148 --config workspace/configs/prod/default.yaml
 ```
 
-**File Processing:**
+#### Processing Recorded Data
+
 ```bash
-prod> process --input-dir workspace/inputs/observation_001/ \
-              --output-dir workspace/outputs/prod/ \
-              --calibration workspace/calibration/my_cal.yaml
+# Process from file
+correlator.bat prod process --input-file workspace/inputs/observation_20260124.npy
+
+# With specific configuration
+correlator.bat prod process --input-file data/obs.npy --config workspace/configs/prod/array64.yaml
 ```
 
-**Monitoring:**
+### File-Based Processing
+
+Process pre-recorded antenna data from NumPy files:
+
 ```bash
-# Start streaming in one terminal
-prod> stream --source tcp://antenna-server:7148
+# Using development mode with file input
+correlator.bat dev run --mode file --input-file workspace/inputs/simple_signal.npy
 
-# In another terminal, monitor:
-correlator prod
-prod> monitor
+# Or create a configuration file
+correlator.bat dev run --config workspace/configs/my_config.yaml
 ```
 
-**Calibration:**
-```bash
-prod> calibrate --input workspace/inputs/cal_observations/ \
-                --cal-source 3C84 \
-                --bandpass \
-                --phase \
-                --output my_calibration.yaml
-```
-
-### Production Configuration
-
-Configuration file: `workspace/configs/prod/default.yaml`
-
-```yaml
-operation_mode: production
-data_source: network_stream
-
-# Network streaming
-stream_protocol: tcp
-stream_address: antenna-server:7148
-stream_buffer_size: 10485760   # 10 MB
-stream_timeout: 5.0            # seconds
-
-# Array setup (real telescope)
-n_ants: 64
-n_channels: 4096
-
-# Processing
-integration_time: 1.0
-window_type: hanning
-quantize_bits: 8
-
-# Production features
-enable_monitoring: true
-enable_quality_checks: true
-enable_rfi_detection: true
-enable_logging: true
-log_level: INFO
-log_file: /workspace/logs/correlator.log
-
-# Calibration
-calibration_file: /workspace/calibration/default_cal.yaml
-apply_bandpass_cal: true
-
-# Output
-output_dir: /workspace/outputs/prod
-output_format: hdf5
-```
-
-### Production Safety Features
-
-1. **Confirmation Required**: Production mode asks for confirmation before starting
-2. **No Simulations**: Config validation prevents simulated data in production
-3. **Stream Protection**: Prevents exit while streaming is active
-4. **Automatic Monitoring**: Enables monitoring/quality checks by default
-5. **Structured Logging**: Production-grade logging with file output
-
----
+**Data Format Requirements:**
+- NumPy array (.npy file)
+- Shape: `(n_antennas, n_samples)`
+- Dtype: `complex64` or `complex128`
+- Complex time-domain signals
 
 ## Configuration
 
-### Configuration System
-
-The correlator uses YAML configuration files to define all processing parameters. Configuration is mode-specific.
-
 ### Configuration Files
 
-- **Development**: `workspace/configs/dev/default.yaml`
-- **Production**: `workspace/configs/prod/default.yaml`
+Configuration files use YAML format and allow you to specify all correlator parameters.
 
-### Key Configuration Parameters
+#### Example: Development Configuration
 
-**Array Configuration:**
 ```yaml
-n_ants: 8                    # Number of antennas
-ant_radius: 10.0             # Array radius (meters)
-# Or specify exact positions:
-ant_positions:               # [[x1, y1], [x2, y2], ...]
-  - [0.0, 0.0]
-  - [10.0, 0.0]
-```
-
-**Signal Parameters:**
-```yaml
-sample_rate: 1024.0          # Hz
-center_freq: 1420405751.77   # Hz (HI line: 1.420 GHz)
-```
-
-**F-Engine (Channelization):**
-```yaml
-n_channels: 256              # Must be power of 2
-window_type: hanning         # rectangular/hanning/hamming/blackman
-quantize_bits: 0             # 0=none, 8/16 for production
-overlap_factor: 0.0          # 0.0 to 0.5
-```
-
-**X-Engine (Correlation):**
-```yaml
-integration_time: 1.0        # seconds per integration
-```
-
-**Data Source (Development):**
-```yaml
+# dev_config.yaml
+operation_mode: development
 data_source: simulated
-sim_duration: 10.0           # seconds
-sim_snr: 20.0                # dB
-sim_realtime: false
-```
 
-**Data Source (Production):**
-```yaml
-data_source: network_stream  # or 'file'
-stream_protocol: tcp         # tcp/udp/spead
-stream_address: host:7148
-stream_buffer_size: 10485760 # bytes
-```
+# Array configuration
+n_ants: 8
+ant_radius: 10.0  # meters
 
-**Output:**
-```yaml
-output_dir: /workspace/outputs/prod
-output_format: hdf5          # npy/hdf5/fits
+# Signal parameters
+sample_rate: 1024.0  # Hz
+center_freq: 1420000000.0  # 1.42 GHz (HI line)
+
+# F-engine
+n_channels: 256
+window_type: hanning
+quantize_bits: 0  # No quantization
+overlap_factor: 0.0
+
+# X-engine
+integration_time: 1.0  # seconds
+
+# Simulation
+sim_duration: 20.0
+sim_snr: 20.0
+sim_source_angles: [0.0, 0.5236]  # radians
+
+# Delay compensation
+enable_delays: true
+phase_center: [1.0, 0.0, 0.0]  # Unit vector
+
+# Output
+output_dir: workspace/outputs
 save_visibilities: true
+output_format: npy
+max_integrations: null
+```
+
+#### Example: Production Configuration
+
+```yaml
+# prod_config.yaml
+operation_mode: production
+data_source: network_stream
+
+# Network configuration
+stream_protocol: tcp
+stream_address: telescope-server:7148
+stream_buffer_size: 10485760  # 10 MB
+
+# Array (64-element array)
+n_ants: 64
+ant_radius: 100.0
+
+# Signal parameters
+sample_rate: 2048000.0  # 2.048 MHz
+center_freq: 1420405751.77  # Precise HI line
+
+# F-engine (high resolution)
+n_channels: 4096
+window_type: hanning
+quantize_bits: 8  # Production quantization
+overlap_factor: 0.25
+
+# X-engine
+integration_time: 1.0
+
+# Output
+output_dir: workspace/outputs/prod
+output_format: hdf5
 save_channelised: false
+
+# Production features
+enable_monitoring: true
+enable_logging: true
+log_level: INFO
+log_file: workspace/logs/correlator.log
 ```
 
-### Loading Custom Configurations
+#### Loading Configuration
 
 ```bash
-# In dev mode
-dev> config load workspace/configs/dev/my_config.yaml
+# From command line
+correlator.bat dev run --config workspace/configs/my_config.yaml
 
-# In prod mode
-prod> config load workspace/configs/prod/array64.yaml
-
-# Save current config
-prod> config save my_current_config.yaml
+# Override specific parameters
+correlator.bat dev run --config my_config.yaml --n-ants 16 --sim-duration 5.0
 ```
 
----
+### Configuration Parameters
 
-## Running Tests
+#### Array Configuration
+- `n_ants`: Number of antennas (≥ 2)
+- `ant_positions`: Explicit antenna positions `[[x1,y1], [x2,y2], ...]` or null for circular array
+- `ant_radius`: Radius for auto-generated circular array (meters)
 
-The correlator includes a comprehensive test suite with 33 tests covering all components.
+#### Signal Parameters
+- `sample_rate`: ADC sample rate (Hz)
+- `center_freq`: Observation center frequency (Hz)
 
-### Test Structure
+#### F-Engine Parameters
+- `n_channels`: Number of frequency channels (must be power of 2)
+- `window_type`: Window function (`rectangular`, `hanning`, `hamming`, `blackman`)
+- `quantize_bits`: Quantization bit depth (0 = no quantization, 8/16 typical)
+- `overlap_factor`: FFT window overlap (0.0 to 0.5)
 
-```
-tests_harness/
-├── unit/                        # Unit tests
-│   ├── test_fengine.py          # F-engine tests (8 tests)
-│   ├── test_xengine.py          # X-engine tests (9 tests)
-│   ├── test_delay.py            # Delay compensation (7 tests)
-│   └── test_frontend.py         # Data ingestion (6 tests)
-│
-└── integration/                 # Integration tests
-    └── test_fx_pipeline.py      # End-to-end tests (3 tests)
-```
+#### X-Engine Parameters
+- `integration_time`: Time integration period (seconds)
 
-### Running All Tests
+#### Delay Compensation
+- `enable_delays`: Enable geometric delay correction (true/false)
+- `phase_center`: Pointing direction as unit vector `[x, y, z]`
 
-```bash
-# Run complete test suite
-correlator test
+#### Output Parameters
+- `output_dir`: Directory for output files
+- `output_format`: File format (`npy`, `hdf5`, `fits`)
+- `save_channelised`: Save intermediate F-engine output (true/false)
+- `save_visibilities`: Save integrated visibilities (true/false)
+- `max_integrations`: Maximum integrations to compute (null = unlimited)
 
-# Expected output:
-# ============================= test session starts ==============================
-# ...
-# ============================== 33 passed in 2.23s ==============================
-```
+## Output Data
 
-### Running Specific Tests
+The correlator produces visibility measurements for each integration period.
 
-```bash
-# Run only unit tests
-correlator test tests_harness/unit/
-
-# Run only integration tests
-correlator test tests_harness/integration/
-
-# Run specific test file
-correlator test tests_harness/unit/test_fengine.py
-
-# Run specific test
-correlator test tests_harness/unit/test_fengine.py::TestFEngine::test_fengine_initialization
-```
-
-### Test Coverage
-
-The test suite validates:
-
-- ✅ F-Engine channelization (FFT, windowing, quantization)
-- ✅ X-Engine correlation (baseline computation, accumulation)
-- ✅ Delay compensation (geometric delays, phase rotation)
-- ✅ Data ingestion (simulated streams, file loading)
-- ✅ Configuration management (loading, validation)
-- ✅ End-to-end pipeline (complete FX correlation)
-
-### Adding Tests
-
-To add new tests:
-
-1. Create test file in `tests_harness/unit/` or `tests_harness/integration/`
-2. Follow pytest conventions
-3. Run tests to verify
-
-Example test:
-```python
-def test_my_feature():
-    config = CorrelatorConfig()
-    config.n_ants = 4
-    # ... test code ...
-    assert result == expected
-```
-
----
-
-## Accuracy Validation
-
-**How do you test correlator accuracy without real antennas?**
-
-The correlator includes comprehensive accuracy validation using synthetic data with known analytical solutions. This ensures the implementation is mathematically correct before connecting to real telescopes.
-
-### Validation Methods
-
-#### 1. Analytical Solutions
-Test against known mathematical results:
-- **Delay compensation**: Verify geometric delays match expected values for known antenna positions and source directions
-- **FFT accuracy**: Test with pure sinusoidal inputs and verify peak detection and phase
-- **Correlation properties**: Validate Hermitian symmetry, autocorrelation reality, and cross-correlation amplitudes
-
-#### 2. Synthetic Test Scenarios
-Generate test data with known properties:
-- **Perfect correlation**: Identical signals on multiple antennas
-- **Known delays**: Signals with controlled phase differences
-- **Frequency structure**: Signals with known spectral properties
-- **Noise characteristics**: Controlled signal-to-noise ratios
-
-#### 3. Astronomical Scenarios
-Test with realistic telescope configurations:
-- **Point sources**: Single astronomical sources at known positions
-- **Array geometry**: Different baseline lengths and orientations
-- **Frequency channels**: Verify processing across the band
-
-### Running Accuracy Tests
-
-```bash
-# Run accuracy validation demo
-python tests_harness/validate_accuracy.py
-
-# Run specific accuracy test
-python tests_harness/validate_accuracy.py delay_test
-python tests_harness/validate_accuracy.py fft_test
-python tests_harness/validate_accuracy.py correlation_test
-python tests_harness/validate_accuracy.py astronomical_test
-
-# Run all accuracy tests
-python tests_harness/validate_accuracy.py all
-```
-
-### Accuracy Test Results
-
-The accuracy validation tests verify:
-
-- ✅ **Delay accuracy**: < 1 picosecond precision for geometric delays
-- ✅ **FFT precision**: Exact peak detection for pure tones
-- ✅ **Correlation fidelity**: < 0.001% error for known signal correlations
-- ✅ **Physical validity**: Autocorrelations are real and positive
-- ✅ **Hermitian symmetry**: Vᵢⱼ = Vⱼᵢ*
-
-### Example: Delay Accuracy Test
-
-```python
-# Test geometric delay calculation
-ant_pos = [[0,0,0], [100,0,0]]  # 100m baseline
-source_dir = [1,0,1]/√2          # 45° elevation
-
-expected_delay = (100 * cos(45°)) / c  # ~0.333 ns
-actual_delay = delay_engine.get_delays(1e9)[1]
-
-assert abs(actual_delay - expected_delay) < 1e-12  # Sub-picosecond accuracy
-```
-
-### Example: Correlation Accuracy Test
-
-```python
-# Test with identical signals (perfect correlation)
-signal = randn(64) + 1j * randn(64)
-spectrum = [signal, signal]  # Same on both antennas
-
-vis = xengine.correlate_spectrum(spectrum)
-
-# Cross-correlation should equal autocorrelation
-assert allclose(vis[2,:], signal * conj(signal))
-```
-
-### Validation Without Hardware
-
-**Q: How can you be sure the correlator works without real antennas?**
-
-**A:** By testing against analytical solutions:
-
-1. **Mathematical verification**: Compare outputs to known equations
-2. **Synthetic scenarios**: Generate data with predictable results
-3. **Physical constraints**: Verify outputs satisfy radio astronomy laws
-4. **Component isolation**: Test each stage independently
-5. **End-to-end validation**: Complete pipeline with known inputs
-
-The correlator passes all accuracy tests, confirming mathematical correctness and readiness for real telescope data.
-
----
-
-## Docker Details
-
-### Container Architecture
-
-The correlator runs in a Docker container for:
-- **Portability**: Runs identically on Windows/Linux/Mac
-- **Reproducibility**: Same environment every time
-- **Isolation**: Dependencies don't conflict with your system
-- **Ease of deployment**: Single `docker build` command
-
-### Docker Image
-
-**Base image**: `python:3.11-slim`  
-**Size**: ~450 MB  
-**Build time**: ~15 seconds (after first build)
-
-### What's Inside the Container
+### File Naming Convention
 
 ```
-Container Contents:
-├── /usr/local/bin/python         # Python 3.11
-├── /usr/local/lib/python3.11/    # Python packages
-│   ├── numpy
-│   ├── scipy
-│   ├── matplotlib
-│   └── pytest
-├── /app/src/correlator/          # Correlator code
-└── /workspace/                   # Your data (mounted from host)
+workspace/outputs/
+├── visibility_0001.npy      # First integration
+├── visibility_0002.npy      # Second integration
+├── visibility_0003.npy
+├── ...
+├── config.yaml              # Configuration used for this run
+└── channelised.npy          # (Optional) F-engine output
 ```
 
-### Building the Image
+### Visibility Data Format
 
-```bash
-correlator build
+**Shape:** `(n_baselines, n_channels)`
 
-# Or manually:
-docker build -f app/Dockerfile -t telescope-correlator .
-```
-
-### Volume Mounting
-
-The `workspace/` directory on your computer is mounted to `/workspace` inside the container:
-
-```
-Your Computer               Docker Container
-─────────────               ────────────────
-workspace/              →   /workspace/
-├── configs/            →   /workspace/configs/
-├── outputs/            →   /workspace/outputs/
-├── inputs/             →   /workspace/inputs/
-├── logs/               →   /workspace/logs/
-└── calibration/        →   /workspace/calibration/
-```
-
-This means:
-- ✅ Outputs are saved to your computer
-- ✅ Configs are read from your computer
-- ✅ Data persists after container stops
-- ✅ You can edit configs outside container
-
-### Manual Docker Commands
-
-```bash
-# Development mode
-docker run -it --rm \
-  -v "${PWD}/workspace:/workspace" \
-  telescope-correlator \
-  python -m correlator dev
-
-# Production mode (needs network access)
-docker run -it --rm \
-  --network host \
-  -v "${PWD}/workspace:/workspace" \
-  telescope-correlator \
-  python -m correlator prod
-
-# Run tests
-docker run --rm \
-  -v "${PWD}:/workspace" \
-  -w /workspace \
-  telescope-correlator \
-  pytest tests_harness/ -v
-```
-
-### Docker Cleanup
-
-```bash
-# Remove old images
-docker image rm telescope-correlator
-
-# Prune unused images
-docker image prune -f
-
-# Clean everything
-docker system prune -a
-```
-
----
-
-## Data Formats
-
-### Input Data (Production Mode)
-
-**Network Streaming Format:**
-- **Type**: Interleaved complex float32 samples
-- **Layout**: `[ant0_real, ant0_imag, ant1_real, ant1_imag, ...]`
-- **Byte order**: Little-endian
-- **Packet structure**: Continuous stream, no headers (raw samples)
-
-**File Formats (Planned):**
-- HDF5: Hierarchical data format (astronomy standard)
-- FITS: Flexible Image Transport System (astronomy standard)
-- Binary: Raw interleaved complex samples
-
-### Output Data
-
-**Visibility Files:**
-- **Format**: NumPy `.npy` files (default) or HDF5
-- **Naming**: `visibility_0001.npy`, `visibility_0002.npy`, ...
-- **Structure**: Complex array `(n_baselines, n_channels, n_integrations)`
-- **Type**: `complex64` (complex float32)
+where:
+- `n_baselines = n_ants * (n_ants + 1) / 2` (includes autocorrelations)
+- For 4 antennas: 10 baselines
+- For 8 antennas: 36 baselines
+- For 64 antennas: 2080 baselines
 
 **Baseline Ordering:**
-```python
-# Auto-correlations and cross-correlations
-# For 4 antennas:
-baselines = [
-    (0,0), (0,1), (0,2), (0,3),  # Ant 0 with all
-    (1,1), (1,2), (1,3),          # Ant 1 with 1,2,3
-    (2,2), (2,3),                 # Ant 2 with 2,3
-    (3,3)                         # Ant 3 with 3
-]
-# Total: n_baselines = n_ants * (n_ants + 1) / 2
-```
+1. Autocorrelations first: (0,0), (1,1), (2,2), ...
+2. Cross-correlations: (0,1), (0,2), ..., (n-2,n-1)
 
-**Configuration File:**
-- **File**: `config.yaml` in output directory
-- **Purpose**: Record all parameters for reproducibility
-- **Format**: YAML with all settings used
-
-**Visualization Plots (Dev Mode):**
-- **Format**: PNG images
-- **Naming**: `visibility_XXXX_visualization.png`
-- **Content**: Amplitude and phase plots
+**Data Type:** `complex128` (real for autocorrelations)
 
 ### Reading Output Data
 
-**Python:**
 ```python
 import numpy as np
 
 # Load visibility data
 vis = np.load('workspace/outputs/visibility_0001.npy')
-print(f"Shape: {vis.shape}")  # (n_baselines, n_channels, n_integrations)
+print(f"Shape: {vis.shape}")  # (n_baselines, n_channels)
 
-# Extract amplitude and phase
-amplitude = np.abs(vis)
-phase = np.angle(vis)
+# Extract autocorrelations (antenna powers)
+n_ants = 4
+autocorr = vis[:n_ants, :]  # First n_ants baselines
 
-# Access specific baseline/channel
-baseline_0 = vis[0, :, :]  # First baseline, all channels
+# Extract cross-correlations
+cross_corr = vis[n_ants:, :]
+
+# Examine specific baseline (e.g., antennas 0-1)
+baseline_01 = vis[4, :]  # Depends on ordering
 ```
 
-**Loading Configuration:**
+### HDF5 Format
+
+When using `output_format: hdf5`:
+
 ```python
-import yaml
+import h5py
 
-with open('workspace/outputs/config.yaml', 'r') as f:
-    config = yaml.safe_load(f)
-    
-print(f"Antennas: {config['n_ants']}")
-print(f"Channels: {config['n_channels']}")
+with h5py.File('workspace/outputs/visibility_0001.h5', 'r') as f:
+    vis = f['visibilities'][:]
+    print(f"Shape: {vis.shape}")
+    print(f"Attributes: {dict(f.attrs)}")
 ```
 
----
+### FITS Format
+
+When using `output_format: fits`:
+
+```python
+from astropy.io import fits
+
+with fits.open('workspace/outputs/visibility_0001.fits') as hdul:
+    real_part = hdul['REAL'].data
+    imag_part = hdul['IMAG'].data
+    vis = real_part + 1j * imag_part
+```
+
+## Testing
+
+The correlator includes comprehensive test suites.
+
+### Run All Tests
+
+```bash
+# Using Docker
+correlator.bat test
+
+# Or with native Python
+pytest tests_harness/ -v
+```
+
+### Test Categories
+
+1. **Unit Tests** (`tests_harness/unit/`)
+   - Individual component testing
+   - F-engine FFT accuracy
+   - X-engine correlation
+   - Delay compensation
+
+2. **Integration Tests** (`tests_harness/integration/`)
+   - Full pipeline testing
+   - End-to-end workflows
+   - Data format validation
+
+3. **Validation Tests** (`tests_harness/validate_accuracy.py`)
+   - Analytical validation
+   - Known signal testing
+   - Accuracy benchmarking
+
+### Run Specific Tests
+
+```bash
+# Test F-engine only
+pytest tests_harness/unit/test_fengine.py -v
+
+# Test delay compensation
+pytest tests_harness/unit/test_delay.py -v
+
+# Run validation suite
+python tests_harness/validate_accuracy.py all
+```
+
+## Examples
+
+### Example 1: Basic Simulation
+
+```bash
+# Simple 4-antenna correlation
+correlator.bat dev run --n-ants 4 --sim-duration 10.0 --output-dir workspace/outputs/ex1
+```
+
+### Example 2: Large Array Simulation
+
+```bash
+# 64-antenna array with high resolution
+correlator.bat dev run \
+  --n-ants 64 \
+  --n-channels 4096 \
+  --integration-time 2.0 \
+  --sim-duration 60.0 \
+  --output-dir workspace/outputs/ex2
+```
+
+### Example 3: Process Test Data
+
+```bash
+# Generate test data first
+cd workspace/inputs
+python generate_test_data.py
+
+# Process the test data
+cd ../..
+correlator.bat dev run \
+  --mode file \
+  --input-file workspace/inputs/large_test.npy \
+  --n-channels 512 \
+  --output-dir workspace/outputs/ex3
+```
+
+### Example 4: Custom Configuration
+
+Create `my_experiment.yaml`:
+
+```yaml
+operation_mode: development
+data_source: simulated
+n_ants: 16
+n_channels: 1024
+sample_rate: 2048.0
+integration_time: 5.0
+sim_duration: 120.0
+window_type: blackman
+overlap_factor: 0.25
+output_format: hdf5
+```
+
+Run:
+
+```bash
+correlator.bat dev run --config my_experiment.yaml
+```
+
+### Example 5: Astronomical Observation Simulation
+
+```bash
+# Simulate HI line observation
+correlator.bat dev run \
+  --n-ants 8 \
+  --center-freq 1420000000 \
+  --sample-rate 2048000 \
+  --n-channels 2048 \
+  --integration-time 10.0 \
+  --sim-duration 600.0 \
+  --output-format hdf5
+```
 
 ## Troubleshooting
 
 ### Common Issues
 
-**1. Docker not running**
-```
-Error: Cannot connect to Docker daemon
-```
-**Solution**: Start Docker Desktop and wait for it to fully start.
+#### 1. Docker Container Won't Start
 
-**2. Port already in use (Production)**
-```
-Error: Address already in use
-```
-**Solution**: Another program is using the port. Change port in config or stop the other program.
-
-**3. Container fails to build**
-```
-Error: Failed to build image
-```
-**Solution**: 
-- Check internet connection (needs to download dependencies)
-- Try: `docker system prune -a` then rebuild
-- Check Docker has enough disk space
-
-**4. Permission denied (Linux)**
-```
-Error: Permission denied accessing /workspace
-```
-**Solution**: Run with proper permissions or add user to docker group:
 ```bash
-sudo usermod -aG docker $USER
+# Check Docker is running
+docker --version
+
+# Remove old containers
+docker ps -a
+docker rm telescope-correlator
+
+# Rebuild image
+correlator.bat build
 ```
 
-**5. Can't find output files**
-```
-No visibility files found
-```
-**Solution**: Check `workspace/outputs/` directory on your host computer. Files are saved there, not inside the container.
+#### 2. "n_channels must be a power of 2"
 
-**6. Tests fail**
+The FFT requires the number of channels to be a power of 2 (e.g., 64, 128, 256, 512, 1024, 2048, 4096).
+
+```bash
+# Correct
+correlator.bat dev run --n-channels 512
+
+# Incorrect
+correlator.bat dev run --n-channels 500  # Error!
 ```
-Some tests failed
+
+#### 3. Out of Memory
+
+For large arrays or high channel counts:
+
+```bash
+# Reduce parameters
+--n-channels 256    # Instead of 4096
+--chunk-size 2048   # Instead of 8192
+--max-integrations 10  # Limit output
 ```
-**Solution**:
-- Rebuild container: `correlator build`
-- Check if Docker has enough memory (need 2GB minimum)
-- View specific test errors for details
+
+#### 4. File Not Found Errors
+
+Ensure paths use the correct workspace mount:
+
+```bash
+# Correct (inside Docker container)
+--input-file /workspace/inputs/data.npy
+--output-dir /workspace/outputs/
+
+# Incorrect
+--input-file ./data.npy  # May not be mounted
+```
+
+#### 5. Visibility Shape Mismatch
+
+For `n_ants` antennas:
+- Number of baselines = `n_ants * (n_ants + 1) / 2`
+- 4 ants → 10 baselines
+- 8 ants → 36 baselines
+- 16 ants → 136 baselines
 
 ### Getting Help
 
-**In CLI:**
 ```bash
-dev> help                  # Show all commands
-dev> help run              # Help for specific command
+# Mode help
+correlator.bat dev --help
+correlator.bat prod --help
+
+# Command help
+correlator.bat dev run --help
 ```
 
-**Check logs (Production):**
-```bash
-# View log file
-cat workspace/logs/correlator.log
+## System Requirements
 
-# Or in real-time
-tail -f workspace/logs/correlator.log
+### Minimum Requirements
+- CPU: 2 cores, 2.0 GHz
+- RAM: 4 GB
+- Disk: 5 GB free space
+- OS: Windows 10/11, Linux (Ubuntu 20.04+), macOS 11+
+
+### Recommended for Production
+- CPU: 8+ cores, 3.0+ GHz
+- RAM: 16+ GB
+- Disk: 100+ GB SSD
+- GPU: Optional (for future CUDA acceleration)
+
+### Performance Guidelines
+
+| Array Size | Channels | Integration | RAM Usage | Processing Speed |
+|------------|----------|-------------|-----------|------------------|
+| 4 ants     | 256      | 1s          | ~500 MB   | Real-time        |
+| 8 ants     | 512      | 1s          | ~1 GB     | Real-time        |
+| 16 ants    | 1024     | 1s          | ~2 GB     | Near real-time   |
+| 64 ants    | 4096     | 1s          | ~8 GB     | Batch preferred  |
+
+## Architecture Overview
+
+For detailed information about the system architecture, signal processing algorithms, and implementation details, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Contributing
+
+Contributions are welcome! Please ensure:
+- All tests pass: `correlator.bat test`
+- Code follows existing style
+- Add tests for new features
+- Update documentation
+
+## License
+
+This project is part of academic research. Please cite appropriately if used in publications.
+
+## Citation
+
+If you use this correlator in your research, please cite:
+
+```
+Telescope Correlator - FX Architecture
+[Author], [Institution], 2026
 ```
 
-**Verbose mode:**
-Set log level to DEBUG in config:
-```yaml
-log_level: DEBUG
-```
+## Contact
 
-### Reporting Issues
+For questions, issues, or contributions:
+- Create an issue on GitHub
+- Email: [your-email@institution.edu]
 
-When reporting issues, include:
-1. Command you ran
-2. Full error message
-3. Operating system
-4. Docker version (`docker --version`)
-5. Contents of config file (if relevant)
+## Acknowledgments
+
+This correlator was developed as part of [Institution] research in radio astronomy signal processing and software-defined radio telescopes.
 
 ---
 
-## Advanced Usage
-
-### Custom Antenna Layouts
-
-Instead of circular array, specify exact positions in config:
-
-```yaml
-ant_positions:  # [x, y] in meters
-  - [0.0, 0.0]
-  - [10.0, 0.0]
-  - [5.0, 8.66]
-  - [-5.0, 8.66]
-  - [-10.0, 0.0]
-  - [-5.0, -8.66]
-  - [5.0, -8.66]
-  - [10.0, -10.0]
-```
-
-### Output Format Selection
-
-```yaml
-output_format: hdf5  # or 'npy' or 'fits' (fits planned)
-```
-
-### Performance Tuning
-
-```yaml
-chunk_size: 8192           # Larger = more memory, faster
-integration_time: 0.5      # Shorter = more outputs, more I/O
-quantize_bits: 8           # Reduce data size (8 or 16 bits)
-overlap_factor: 0.25       # Better frequency response, more compute
-```
-
-### RFI Detection
-
-```yaml
-enable_rfi_detection: true
-rfi_threshold: 3.0         # sigma above mean
-```
-
-### Batch Processing
-
-Process multiple files:
-```bash
-prod> process --input-dir workspace/inputs/night_001/
-prod> process --input-dir workspace/inputs/night_002/
-prod> process --input-dir workspace/inputs/night_003/
-```
-
-### Monitoring Statistics
-
-Production mode tracks:
-- Data throughput (MB/s)
-- Packet rate
-- Buffer utilization
-- Integration rate
-- Data quality metrics
-- System resources
-
-Access with:
-```bash
-prod> monitor
-prod> status
-```
-
-### Network Protocols
-
-**TCP** (default): Reliable, ordered delivery
-```yaml
-stream_protocol: tcp
-```
-
-**UDP**: High throughput, some packet loss acceptable
-```yaml
-stream_protocol: udp
-```
-
-**SPEAD** (planned): Radio astronomy standard protocol
-```yaml
-stream_protocol: spead
-```
-
-### Integration with Other Tools
-
-**Export to CASA:**
-```python
-# Convert .npy to CASA measurement set (future)
-# For now, process .npy with numpy
-```
-
-**Export to FITS:**
-```yaml
-output_format: fits  # Planned feature
-```
-
----
-
-## Summary
-
-This telescope correlator provides:
-
-✅ **Complete FX correlation pipeline** for radio telescope arrays  
-✅ **Dual operation modes** - Development (simulation) and Production (real data)  
-✅ **Easy-to-use CLI** with comprehensive help  
-✅ **Network streaming** for live telescope data  
-✅ **Containerized** for portability and reproducibility  
-✅ **Fully tested** with 33 comprehensive tests  
-✅ **Production-ready** for real astronomical observations  
-✅ **Well documented** with architecture details and examples  
-
-### Getting Started Checklist
-
-- [ ] Install Docker Desktop
-- [ ] Clone repository
-- [ ] Run `correlator build`
-- [ ] Run `correlator test` (should pass 33 tests)
-- [ ] Try `correlator dev` (development mode)
-- [ ] Run a simulation
-- [ ] Visualize results
-- [ ] Read ARCHITECTURE.md for details
-- [ ] When ready, configure and use `correlator prod` for real data
-
-### Next Steps
-
-- **For Learning**: Use development mode extensively
-- **For Development**: Add new features, run tests
-- **For Production**: Configure production mode, connect telescopes
-- **For Research**: Process real observations, apply calibration
-
----
-
-**Built for radio astronomers, by radio astronomers** 🔭
-
-For detailed system architecture, see [ARCHITECTURE.md](ARCHITECTURE.md)  
-For implementation details, see [PRODUCTION_READY_SUMMARY.md](PRODUCTION_READY_SUMMARY.md)
+**Version:** 1.0.0  
+**Last Updated:** January 2026  
+**Documentation:** [ARCHITECTURE.md](ARCHITECTURE.md) for technical details

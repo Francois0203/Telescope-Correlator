@@ -1,0 +1,143 @@
+\section{Python-based Software Correlators for Radio Telescopes}
+Building on the previous talk about signal correlation architectures for telescopes, this part is about in-or-out-of-box software correlators implemented utilising Python, specifically for small to medium-sized radio telescope arrays. Python gained prominence in radio astronomy systems in the last decade, primarily due to its quick development cycle, wide scientific community, and flexibility to interface with high-performance backends (e.g. C, CUDA, or GPU-based processing units).
+
+Python-based correlators have also been viewed as a useful solution to flexible data acquisition pipelines and real-time signal processing in experimental and research radio astronomy. Python is not performance-focused like compiled languages but typically acts as a control-layer controlling high-performance C or C++-based libraries and GPU-based computation kernels. Within this hybrid solution, Python is responsible for data ingestion, configuration, scheduling, and output control but passes over compute-heavy operations (e.g., FFTs and complex cross-multiplications) to lower-level more performance-optimised implementations \cite{Merry2023}.
+
+The focus of this review is on correlators implemented or controlled using Python for scientific radio interferometry applications that utilise four or more elements in a centralised configuration.
+
+    \subsection{Design Principles and System Architecture}
+    Python-based correlators typically adopt the FX architecture, wherein the digitised voltage streams from multiple antennas are first channelised (F-engine) and subsequently cross-multiplied per channel (X-engine). The reason for preferring FX over XF is its computational efficiency, particularly in systems where spectral resolution or bandwidth is relatively high \cite{Romein2021}. FX correlators are also more amenable to pipelined processing and batch computation—both essential in environments where Python is part of the software stack.
+
+    In modern software correlators, especially those implemented using Python, the typical data pipeline involves multiple stages:
+
+    \begin{itemize}
+      \item \textbf{Antenna Digitisation:} Each antenna’s analogue signal is digitised via an Analogue-to-Digital Converter (ADC), often implemented on FPGA hardware. The ADC outputs a high-speed stream of raw voltage samples (commonly complex baseband). These are tagged with metadata such as time stamps, sample rates, and antenna identifiers. The Python control software frequently interfaces with the digitiser using UDP, TCP, or PCIe endpoints \cite{Gorthi2021}.
+    
+      \item \textbf{F-engine (Channelisation):} The digitised time series are channelised into spectral bins via FFT or polyphase filter banks. In Python-based systems, this may be implemented using NumPy for small-scale arrays, or via GPU-accelerated libraries such as CuPy or PyCUDA. Channelisation is often performed in batches to amortise interpreter overheads and optimise GPU utilisation \cite{Merry2023}.
+    
+      \item \textbf{Data Reorganisation (Corner-Turn):} Once channelised, the data are typically reordered such that all antenna spectra for a given frequency bin are co-located. This memory transpose, or ``corner-turn'', enables efficient baseline processing in the next stage. Python processes often manage this step using shared memory arrays or high-speed buffers in distributed memory architectures.
+    
+      \item \textbf{X-engine (Cross-Correlation):} For each frequency channel, the signal from every antenna is multiplied with the complex conjugate of every other. This matrix outer-product is computationally intensive and is almost always offloaded to a backend such as CUDA, xGPU, or other parallel computing frameworks \cite{Romein2021}. Python initiates and schedules the GPU kernels but does not perform the multiplications itself.
+    
+      \item \textbf{Accumulation and Integration:} Products cross-multiplied are averaged across an integration window to create visibilities. These are then stored in standard forms (e.g. UVFITS, Measurement Sets, or HDF5) and may afterwards be calibrated and imaged. Python libraries h5py and astropy are usually employed for this process.
+    \end{itemize}
+
+    Several correlator projects illustrate the above architecture, including the correlators developed for the CHIME/FRB outrigger telescopes \cite{Leung2024}, as well as smaller academic prototypes developed using SNAP boards and NumPy pipeline s\cite{Gorthi2021}.
+
+    \subsection{Motivation for Using Python in Correlators}
+    Python’s role in radio astronomy software has steadily increased due to a confluence of practical and engineering factors. Among the chief advantages of Python are:
+
+   \begin{itemize}
+        \item \textbf{Rapid Prototyping:} The natural syntax of Python and large standard library enable researchers to code and test correlation pipelines in a matter of minutes, particularly when testing new algorithms or monitoring policies \cite{Leung2024}.
+            
+        \item \textbf{Ecosystem Compatibility:}
+        Python has a wide range of scientific computing libraries, including NumPy, SciPy, CuPy, PyCUDA, pyFFTW, and many more. It is also simple to interface with C and C++ libraries via interfaces such as Cython and ctypes.
+        
+        \item \textbf{Ease of Orchestration and Control:} Control of telescopes, scheduling jobs, experiment configuration, and managing I/O are typically done in Python due to its superior support for high-level semantics and asynchronous processes \cite{Merry2023}.
+        
+        \item \textbf{Community and Support:} Python pervades astronomy except for correlation (for example, in calibration, imaging, visualisation), making it a natural candidate for an integrated software stack. Usage by projects such as CASA, pyuvdata, and astropy further reinforces this trend.
+    \end{itemize}
+
+    These benefits do not imply that Python is a universal solution. As discussed later, Python’s performance limitations mean that it is rarely used for real-time signal processing on its own. Rather, it acts as a high-level controller of faster components. This layered approach mirrors how large-scale arrays such as MeerKAT and HERA are increasingly adopting heterogeneous computing architectures, with Python providing the orchestration layer \cite{Merry2023, Gorthi2021}.
+
+    \subsection{Implementation Strategies}
+    With Python's interpretative nature and the Global Interpreter Lock (GIL), programmers are forced to apply particular tactics in order to provide the throughput needed for real-time or near real-time radio signal correlation. Most correlators based on Python take advantage of Python's flexibility along with the unadulterated performance of compiled libraries. Popular implementation tactics are:
+
+    \begin{itemize}
+        \item \textbf{Batch Processing:} Rather than processing one sample at a time, signals are gathered in big arrays (e.g. blocks of $2^{16}$ or greater samples). Blocks are processed using vectorised functions in NumPy or CuPy, with lower interpreter overhead from Python \cite{Merry2023}.
+              
+        \item \textbf{Asynchronous Pipelines:} The Python's \texttt{asyncio} library is used to implement non-blocking I/O loops. While the GPU or CPU is working on one batch, the next batch can be loaded, parsed, or written to disk \cite{Merry2023}.
+        
+        \item \textbf{Multiprocessing and GPU Offload:}
+        We use Python's multiprocessing module, or joblib, to implement parallel workers. Alternatively, PyCUDA or GPU offloading with CuPy is used for matrix multiplications and FFT. CuPy allows developers to write code which will feel exactly the same as NumPy but utilize the CUDA runtime.
+        
+        \item \textbf{Hybrid C/CUDA Extensions:} Core functionalities (e.g. FFT, matrix multiplications, baseline calculations) are in C/C++ or CUDA. They are wrapped to Python by the assistance of \texttt{ctypes}, Cython, or shared object libraries. For example, in CHIME/FRB correlator, FFTs and data shuffles are invoked from compiled libraries but controlled by Python scripts \cite{Leung2024}.
+        
+        \item \textbf{Memory Optimisation:} Reuse and proper organisation of the memory are most important. For example, pinned host memory (page-locked memory) enhances CPU and GPU transfer rates. In addition, CuPy's memory pools prevent memory fragmentation and optimise kernel launching \cite{Merry2023}.
+        
+        \item \textbf{Data Parallelism:} Many Python processes (or threads in a GIL-free library like Cython) are assigned to distinct GPUs or frequency slices. The work is divided among available hardware, and results are collated in shared memory or disk.
+    \end{itemize}
+
+    These strategies mitigate Python’s limitations and have enabled correlators to scale well for small-to-mid-sized arrays, especially in testbed and experimental configurations.
+
+    \subsection{Performance Evaluation and Bottlenecks}
+    In evaluating the performance of Python-driven correlators, several key bottlenecks and constraints emerge:
+
+    \begin{itemize}
+        \item \textbf{Data Throughput:} Correlators must read and process tens to hundreds of megabytes per second. For example, Gorthi's FPGA-bound correlator operated at over 450~Mbps for a 12-antenna test array \cite{Gorthi2021}. Python logic in the main data path must be very efficient and avoid too many memory copies.
+
+        \item \textbf{Compute Load:} Correlation is an $O(N^2)$ process in the number of antennas. A 4-element system requires 6 unique baselines, while a 32-element system requires 496. GPU acceleration is required beyond the smallest arrays. Romein demonstrates that modern tensor-core GPUs can provide order-of-magnitude improvements in correlation throughput with mixed-precision techniques \cite{Romein2021}.
+        
+        \item \textbf{Latency and Real-Time Requirements:} For time-domain experiments (e.g. detection of FRBs, gating pulsars), real visibility output must be produced within strict latency constraints. This will most likely demand pipeline parallelism and real-time scheduling. In PyFX for CHIME/FRB, Python-managed logic obtained required latency using large input buffers and precompiled kernels \cite{Leung2024}.
+        
+        \item \textbf{Network and I/O Bottlenecks:} UDP acquisition packet loss or file write latency on writes may reduce performance. Python correlators typically use ring buffers or mmap files to fast storage for intermediate results. These are consumed by independent writer threads or processes to supply continuous ingestion.
+    \end{itemize}
+
+    The literature shows that these performance concerns are solvable at small scales using modern hardware and smart architectural choices. Python’s role remains orchestration and control, not raw computation.
+
+    \subsection{Case Studies of Python Correlators}
+        \subsubsection{PyFX: A Full Python Correlator for CHIME/FRB Outriggers}
+        \cite{Leung2024} introduce PyFX, a full Python correlator for CHIME/FRB outrigger baseband recordings that is written entirely in Python \cite{Leung2024}.  The correlator operates on HDF5 baseband data, performs VLBI delay models, calculates FFT channelisation, and does baseline correlation using NumPy and Numba. Implementation supports pulsar gating, multibeam correlation, and incoherent dedispersion. The authors also successfully demonstrate visibility extraction in several domains, confirming the scientific feasibility of Python as a complete correlator engine.
+        
+        \subsubsection{MeerKAT GPU Channeliser}
+        Merry presents a GPU channeliser design where the FFT stage (F-engine) and reshaping of data are performed by CUDA kernels started and controlled by Python scripts \cite{Merry2023}.
+        
+        The Python code sets up memory buffers, launches kernels, and retrieves frequency-domain data. The channeliser handles four 2~Gsps input streams simultaneously on a single Nvidia V100 GPU. Real-time throughput was achieved by using asynchronous pipelines, CuPy GPU buffers, and persistent memory pools. 
+        
+        \subsubsection{SNAP Board + Python Correlator Prototype}
+        Gorthi reports a 12-element interferometer testbed where digitisation is handled by SNAP boards and correlation done with Python scripts using NumPy \cite{Gorthi2021}. Channelisation and cross-multiplication were done with straightforward Python array operations. The system handled 3×390~kHz bands with integration times of 2–8 seconds, demonstrating suitability for prototyping and educational class room use.
+
+        \subsubsection{Romein's Tensor-Core Correlator}
+        Although Romein's work is CUDA-based X-engines, it is generally summoned via Python front-ends to orchestrate \cite{Romein2021}. The tensor-core correlation library enables radical speed-ups when paired within a Python pipeline and serves as a prototype for future mixed-precision, high-speed correlators with Python orchestration.
+
+    \subsection{System Integration and Data Management}
+    Beyond correlation, Python is often used to integrate the correlator into the broader telescope control and data processing pipeline. Python’s high-level syntax and support for modular programming allow it to interface with:
+
+   \begin{itemize}
+        \item \textbf{Observation Schedulers:} Python programs handle observation schedules and system configuration. Frequency tuning, beam steering, and metadata logging can be automated with scripts before correlation starts.
+        
+        \item \textbf{Hardware Interfaces and FPGA:} Python packages such as \texttt{casperfpga} and \texttt{katcp} are in widespread use for initializing ADCs, FPGA firmware, and backend networks in SNAP and ROACH2 platforms \cite{Gorthi2021}.
+        
+        \item \textbf{File I/O and Formats:} HDF5 is commonly employed to store diagnostic outputs, baseband samples, and visibilities. Python's \texttt{h5py} module, along with NumPy and Astropy, allows for structured, efficient storage and retrieval.
+        
+        \item \textbf{Imaging and Calibration Pipelines:} Correlators based on Python are often deeply coupled with analysis software such as CASA (through Measurement Sets), pyuvdata, and calibration packages. This deep coupling facilitates the ease of workflow because visibilities are directly compatible with downstream tools.
+        
+        \item \textbf{Real-Time Event Triggers:} Visibility results or beamformed outputs may be used to trigger follow-up in real-time in transient detection systems. Python can be employed to interface with FRB or pulsar databases and cloud alert systems.
+    \end{itemize}
+
+    In the correlator CHIME/FRB, as an example, the visibility pipeline is paired with HDF5 writers, delay models, dedispersion steps, and alert triggers—all controlled in Python \cite{Leung2024}. Modularity allows scientists to swap out components, re-run with different parameters, and debug running systems, something which in a monolithic compiled form would be troublesome.
+
+    \subsection{Successes, Challenges, and Emerging Innovations}
+    Python-based correlators have become more commonly used and popular in experimental and even operational radio telescope arrays. The main accomplishments mentioned are:
+
+    \begin{itemize}
+        \item \textbf{Operational Viability:} Fully functional correlators such as PyFX have demonstrated that everything in the basic steps (delay application, FFT, cross-correlation) can be accomplished and implemented in Python with scientific accuracy \cite{Leung2024}.
+        
+        \item \textbf{Rapid Development:} Prototypes may be rolled out in weeks or months as opposed to years, leveraging extensively tested scientific libraries. This is a necessity where rapid iteration and verification are called for.
+
+        \item \textbf{Advanced Features:} Cutting-edge features such as real-time gating, phased-array beamforming, and dual-beam correlation have been introduced with Python with minimal friction \cite{Leung2024}.
+
+        \item \textbf{Educational Value:} Python correlators were used at universities and university laboratories for hands-on teaching in radio astronomy instrumentation \cite{Gorthi2021}.
+    \end{itemize}
+
+    Nonetheless, some challenges still persist:
+    
+    \begin{itemize}
+        \item \textbf{Performance Constraints:} Python programs execute far too slowly compared to compiled C/C++ or FPGA versions. High-bandwidth systems or large antenna systems must use acceleration (GPU, multi-threading, or C extensions) to meet the real-time constraint \cite{Merry2023}.
+        
+        \item \textbf{Scalability:} Correlators scale on the square of the number of antennas. Python overhead is no longer insignificant for more than a few dozen antennas unless a distributed architecture is being used.
+
+        \item \textbf{Maintenance and Debugging:} Very complex Python pipelines involving many asynchronous components are difficult to debug in production. Stability demands good logging, version control, and structured testing.
+    \end{itemize}
+
+    Emerging innovations seek to address these concerns:
+
+    \begin{itemize}
+        \item \textbf{Tensor-Core Acceleration:} Romein's correlator shows that Nvidia tensor cores (previously used for machine learning) are naturally suited to FX correlation. These can be called from Python with CUDA kernel wrappers \cite{Romein2021}.
+        
+        \item \textbf{Just-in-Time Compilation:} Python-friendly JIT compilation is offered in libraries like Numba, which allows NumPy-like syntax to be executed at native levels of performance. PyFX, for instance, uses Numba for the X-engine and FFT stages \cite{Leung2024}.
+        
+        \item \textbf{Distributed Frameworks:} Dask, MPI4Py, or Ray can be used to support load distribution on many CPUs or nodes to allow large Python correlators to be made accessible.
+        
+        \item \textbf{Containerisation and Reproducibility:} Python's native support for Docker and Conda environments make it well-suited to put whole correlator stacks into packages for reproducibility and portability.
+    \end{itemize}

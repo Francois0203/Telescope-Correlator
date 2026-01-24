@@ -27,9 +27,15 @@ def get_baseline_indices(n_ants: int) -> list[Tuple[int, int]]:
         List of (ant_i, ant_j) tuples
     """
     baselines = []
+    # First include autocorrelations for each antenna
     for i in range(n_ants):
-        for j in range(i, n_ants):
+        baselines.append((i, i))
+
+    # Then include cross-correlations with i < j
+    for i in range(n_ants):
+        for j in range(i + 1, n_ants):
             baselines.append((i, j))
+
     return baselines
 
 
@@ -77,17 +83,22 @@ class XEngine:
         """Compute cross-correlations for one time sample (one spectrum per antenna).
         
         Args:
-            channelised_data: Shape (n_ants, n_channels) - one spectrum per antenna
+            channelised_data: Shape (n_ants, n_channels) - frequency-domain spectra
         
         Returns:
             Visibilities shape (n_baselines, n_channels)
         """
         vis = np.zeros((self.n_baselines, self.n_channels), dtype=np.complex128)
-        
+
         for bl_idx, (i, j) in enumerate(self.baselines):
-            # V_ij = E_i * conj(E_j)
-            vis[bl_idx, :] = channelised_data[i, :] * np.conj(channelised_data[j, :])
-        
+            if i == j:
+                # Autocorrelation: always real and positive
+                # V_ii[k] = |E_i[k]|^2
+                vis[bl_idx, :] = np.abs(channelised_data[i, :])**2
+            else:
+                # Cross-correlation: V_ij[k] = E_i[k] * conj(E_j[k])
+                vis[bl_idx, :] = channelised_data[i, :] * np.conj(channelised_data[j, :])
+
         return vis
     
     def accumulate(self, vis: np.ndarray):
@@ -110,6 +121,11 @@ class XEngine:
             Averaged visibilities shape (n_baselines, n_channels)
         """
         avg_vis = self.accumulated_vis / self.accumulation_count
+        
+        # Ensure autocorrelations are strictly real (remove numerical noise in imaginary part)
+        for bl_idx, (i, j) in enumerate(self.baselines):
+            if i == j:
+                avg_vis[bl_idx, :] = avg_vis[bl_idx, :].real
         
         # Reset accumulation
         self.accumulated_vis.fill(0)

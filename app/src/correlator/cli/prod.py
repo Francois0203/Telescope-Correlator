@@ -384,6 +384,11 @@ Type 'help' for full command reference.
                 except Exception as e:
                     print(f"❌ Error saving config: {e}")
     
+    def do_clear(self, arg):
+        """Clear the terminal screen."""
+        import os
+        os.system('cls' if os.name == 'nt' else 'clear')
+    
     def do_help(self, arg):
         """Show help information."""
         if not arg:
@@ -394,7 +399,8 @@ Type 'help' for full command reference.
             print("monitor          Real-time statistics")
             print("calibrate        Calibration pipeline")
             print("status           System health check")
-            print("config           View/edit configuration")
+            print("config           Configuration management")
+            print("clear            Clear terminal screen")
             print("")
             print("help             This help")
             print("exit             Exit CLI")

@@ -51,6 +51,8 @@ class CorrelatorConfig:
     
     # Data source
     data_source: DataSource = "simulated"
+    # Backwards-compatible alias used by CLI and tests
+    mode: Literal["simulated", "file"] = "simulated"
     input_file: Optional[str] = None  # For file-based processing
     
     # Network streaming (production mode)
@@ -96,6 +98,17 @@ class CorrelatorConfig:
     
     def __post_init__(self):
         """Validate and normalize configuration."""
+        # Keep legacy `mode` and `data_source` in sync
+        try:
+            # If constructor provided `mode`, prefer it for data_source
+            if getattr(self, 'mode', None):
+                self.data_source = self.mode  # type: ignore
+        except Exception:
+            pass
+
+        # Ensure the `mode` attribute reflects `data_source`
+        self.mode = self.data_source  # type: ignore
+
         if self.n_ants < 2:
             raise ValueError("n_ants must be >= 2")
         

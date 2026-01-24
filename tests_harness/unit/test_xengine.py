@@ -80,40 +80,40 @@ class TestXEngine:
         spectrum = np.random.randn(n_ants, n_channels) + 1j * np.random.randn(n_ants, n_channels)
         vis = xengine.correlate_spectrum(spectrum)
         
-        # First 3 baselines are autocorrelations: (0,0), (0,1), (0,2)
-        # Wait, with ordering i<=j: (0,0), (0,1), (0,2), (1,1), (1,2), (2,2)
-        # Autocorrelations are at indices 0, 3, 5
-        autocorr_indices = [0, 3, 5]  # (0,0), (1,1), (2,2)
-        
+        # Determine autocorrelation baseline indices dynamically
+        baselines = xengine.baselines
+        autocorr_indices = [baselines.index((i, i)) for i in range(n_ants)]
+
         for idx in autocorr_indices:
-            # Imaginary part should be near zero
+            # Imaginary part should be near zero (within numerical tolerance)
             assert np.allclose(vis[idx, :].imag, 0.0, atol=1e-10)
     
     def test_hermitian_symmetry(self):
-        """Test that V_ij = conj(V_ji)."""
+        """Test that V_ij = conj(V_ji) for frequency-domain correlation."""
         n_ants = 3
         n_channels = 128
-        
+
         xengine = XEngine(
             n_ants=n_ants,
             n_channels=n_channels,
             integration_time=1.0,
             sample_rate=1024.0
         )
-        
+
         spectrum = np.random.randn(n_ants, n_channels) + 1j * np.random.randn(n_ants, n_channels)
         vis = xengine.correlate_spectrum(spectrum)
-        
-        # Get baseline index for (0,1)
+
+        # Get baseline indices
         baselines = xengine.baselines
         idx_01 = baselines.index((0, 1))
-        
-        # Manually compute (1,0) = conj((0,1))
-        v_10 = spectrum[1, :] * np.conj(spectrum[0, :])
+
+        # For frequency-domain correlation: V_ij[k] = E_i[k] * conj(E_j[k])
+        # So: V_10[k] = E_1[k] * conj(E_0[k]) = conj(E_0[k] * conj(E_1[k])) = conj(V_01[k])
         v_01 = vis[idx_01, :]
-        
-        assert np.allclose(v_10, np.conj(v_01))
-    
+        v_10_expected = spectrum[1, :] * np.conj(spectrum[0, :])
+
+        # V_10 should equal conj(V_01)
+        assert np.allclose(v_10_expected, np.conj(v_01))
     def test_accumulation(self):
         """Test visibility accumulation."""
         xengine = XEngine(

@@ -11,6 +11,47 @@ from correlator.core.xengine import XEngine
 from correlator.core.delay import DelayEngine
 
 
+def save_visibility(vis_data: np.ndarray, filepath: Path, format: str = "npy") -> None:
+    """Save visibility data in specified format.
+    
+    Args:
+        vis_data: Visibility array to save
+        filepath: Output file path (without extension)
+        format: Output format: 'npy', 'hdf5', or 'fits'
+    """
+    if format == "npy":
+        np.save(f"{filepath}.npy", vis_data)
+    elif format == "hdf5" or format == "h5":
+        try:
+            import h5py
+            with h5py.File(f"{filepath}.h5", 'w') as f:
+                f.create_dataset('visibilities', data=vis_data)
+                f.attrs['shape'] = vis_data.shape
+                f.attrs['dtype'] = str(vis_data.dtype)
+        except ImportError:
+            print("⚠️  Warning: h5py not installed. Falling back to .npy format")
+            np.save(f"{filepath}.npy", vis_data)
+    elif format == "fits":
+        try:
+            from astropy.io import fits
+            # FITS doesn't support complex types directly, so save real and imaginary parts separately
+            real_data = vis_data.real
+            imag_data = vis_data.imag
+            
+            # Create HDU list with real and imaginary extensions
+            hdu_primary = fits.PrimaryHDU()
+            hdu_real = fits.ImageHDU(real_data, name='REAL')
+            hdu_imag = fits.ImageHDU(imag_data, name='IMAG')
+            hdul = fits.HDUList([hdu_primary, hdu_real, hdu_imag])
+            hdul.writeto(f"{filepath}.fits", overwrite=True)
+        except ImportError:
+            print("⚠️  Warning: astropy not installed. Falling back to .npy format")
+            np.save(f"{filepath}.npy", vis_data)
+    else:
+        print(f"⚠️  Warning: Unknown format '{format}'. Using .npy")
+        np.save(f"{filepath}.npy", vis_data)
+
+
 def run_correlator(config: CorrelatorConfig) -> int:
     """Execute FX correlator pipeline with given configuration.
     
@@ -130,10 +171,13 @@ def run_correlator(config: CorrelatorConfig) -> int:
                 integrated_vis = xengine.get_integrated()
                 integration_count += 1
                 
-                # Save integrated visibility
-                vis_file = output_dir / f"visibility_{integration_count:04d}.npy"
-                np.save(vis_file, integrated_vis)
-                print(f"  Saved integration {integration_count} -> {vis_file.name}")
+                # Save integrated visibility with specified format
+                vis_file_base = output_dir / f"visibility_{integration_count:04d}"
+                save_visibility(integrated_vis, vis_file_base, config.output_format)
+                
+                # Get the actual extension
+                ext = {"npy": ".npy", "hdf5": ".h5", "h5": ".h5", "fits": ".fits"}.get(config.output_format, ".npy")
+                print(f"  Saved integration {integration_count} -> visibility_{integration_count:04d}{ext}")
                 
                 # Check if we've reached max integrations
                 if config.max_integrations and integration_count >= config.max_integrations:

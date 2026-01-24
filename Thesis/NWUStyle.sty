@@ -1,0 +1,199 @@
+\usepackage{graphics}
+\usepackage[dvips]{graphicx}
+%\usepackage[citebordercolor={0 0 0.8}]{hyperref} %Un-comment this line if you want the citations and references to have hyperlinks (requires the hyperref package).
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{tikz}
+\usepackage[longnamesfirst,round,semicolon,authoryear]{natbib}
+\usepackage{adjustbox}
+\usepackage{chngpage}
+\usepackage{ifthen}
+\usepackage{eso-pic}
+
+\bibliographystyle{apalike} %Specify the bibliography style (currently using an APA-like style, which is very close to the Harvard style).
+
+%Specify the margin, page and other dimensions of the Thesis
+\usepackage{geometry}
+ \geometry{
+ a4paper,
+  left=30mm,
+	right=30mm,
+  top=30mm,
+	bottom=30mm 
+ }
+\renewcommand{\baselinestretch}{1.2} 
+\setlength{\parindent}{0mm}
+\setlength{\parskip}{1em}
+
+
+%% OrcID inline logo 
+\newcommand*{\img}[1]{%
+    \raisebox{-.3\baselineskip}{%
+        \includegraphics[
+        height=\baselineskip,
+        width=\baselineskip,
+        keepaspectratio,
+        ]{#1}%
+    }%
+}
+
+%Set up variables
+%==========================================================
+%Set up the \StudentNumber variable. [required]
+\newcommand{\StudentNumber}[1]{ 
+	\newcommand{\studentnumber}{#1} 
+}
+%Set up the \ORCID variable. [required]
+\newcommand{\ORCID}[1]{ 
+	\newcommand{\orcid}{#1} 
+}
+%Set up the \Initials variable. [required]
+\newcommand{\Initials}[1]{ 
+	\newcommand{\initials}{#1} 
+}
+%Set up the \FirstName variable. [required]
+\newcommand{\FirstName}[1]{ 
+	\newcommand{\firstname}{#1} 
+}
+%Set up the \Surname variable. [required]
+\newcommand{\Surname}[1]{ 
+	\newcommand{\surname}{#1} 
+}
+%Set up the \Title variable. [required]
+\newcommand{\Title}[1]{ 
+	\newcommand{\mytitle}{#1} 
+}
+%Set up the \MScorPhD variable. [required]
+\newcommand{\MScorPhD}[1]{ 
+	\newcommand{\mscorphd}{#1} 
+}
+%Set up the \Field variable. [required]
+\newcommand{\Field}[1]{ 
+	\newcommand{\myfield}{#1} 
+}
+%Set up the \GradDate variable. [required]
+\newcommand{\GradDate}[1]{ 
+	\newcommand{\graddate}{#1} 
+}
+%Set up the \Supervisor variable. [required]
+\newcommand{\Supervisor}[1]{ 
+	\newcommand{\supervisor}{#1} 
+}
+%Set up the \Supervisor variable. [required]
+\newcommand{\CoSupervisor}[1]{ 
+	\newcommand{\cosupervisor}{#1} 
+}
+%Set up the \AssistantSupervisor variable. [required]
+\newcommand{\AssistantSupervisor}[1]{ 
+	\newcommand{\assistantsupervisor}{#1} 
+}
+
+%Set up Macros
+%==========================================================
+%Macro for the printing of the optional co-supervisor name.
+\newcommand{\printcosupervisor}[1]{\ifthenelse{\equal{#1}{}}{}{\Large Co-supervisor: {#1}\\}}
+%Macro for the printing of the optional assistant supervisor name.
+\newcommand{\printasssupervisor}[1]{\ifthenelse{\equal{#1}{}}{}{\Large Assistant supervisor: {#1}\\}}
+
+%Set up environments
+%==========================================================
+%Create the Acknowledgements environment
+\newenvironment{Acknowledgements}% environment name
+{% begin code
+	\setcounter{page}{1}
+	\pagenumbering{roman}
+	\chapter*{Acknowledgements}
+}%
+{
+\clearpage
+}% end code
+
+%Create the Abstract environment
+\newenvironment{Abstract}[1]% environment name
+{% begin code
+	\chapter*{Abstract}
+}%
+{
+	\clearpage
+}% end code
+
+%Create the table of abbreviations environment
+\newenvironment{TableOfAbbrev}% environment name
+{% begin code
+	\chapter*{Table of abbreviations}
+}%
+{
+	\clearpage
+}% end code
+
+
+%Set up new commands
+%==========================================================
+
+%Create the new '\cites' command
+\newcommand\cites[1]{\citeauthor{#1}'s\ (\citeyear{#1})}
+
+%Set up the \AssistantSupervisor variable. [required]
+\newcommand{\KeyWords}[1]{ 
+	{\vspace*{\fill}\\ \noindent\emph{Keywords:} {#1}}
+}
+
+%Make the table of contents, list of figures and list of tables.
+\newcommand{\MakeTOCandLOFandLOT}{
+	\clearpage
+	\tableofcontents
+	\clearpage
+	\listoffigures
+	\clearpage
+	\listoftables
+	\clearpage
+}
+
+%Create the title page
+\newcommand{\MakeTitle}{
+
+\pagestyle{empty}
+
+\changetext{\baselineskip}{0em}{0em}{0em}{-50pt}
+%\tikz[remember picture,overlay] \node[opacity=1.0,anchor=north] at (current page.north){{\includegraphics[width=\paperwidth]{img/NWUBack}}};
+%\tikz[overlay,remember picture] \node[opacity=1.0,anchor=north] at (current page.north){{\includegraphics[width=\paperwidth]{img/NWUBack}}};
+\AddToShipoutPictureBG*{%
+  \AtPageUpperLeft{\raisebox{-\height}{\includegraphics[width=0.8\paperwidth]{img/NWUBack}}}%
+}
+%\vspace{5cm}
+
+{\fontfamily{phv}\selectfont 
+\begin{center}
+\begin{adjustbox}{minipage=[b][0.3\textheight][s]{1.15\textwidth},margin=-1cm 0cm 0cm 0cm}
+\begin{tabular}{p{\textwidth}} \vspace{4.5cm}
+	\centering\Huge\textbf{\mytitle
+			}\\
+		~\\
+		~\\
+		~\\
+		\LARGE\textbf{\centering \initials ~ \surname}\\
+	\LARGE\centering
+	%\includegraphics[width=0.05\textwidth]{img/ORCID}
+	\img{img/ORCID}
+	~\textbf{orcid.org/{\color{black}{\orcid}}}\\
+	~\\
+	~\\
+	\Large\centering Thesis submitted for the degree \emph{\mscorphd} in {\myfield} at the North-West University\\
+	~\\
+	~\\
+	\flushleft\Large Supervisor:	{\supervisor}\\
+	\printcosupervisor{\cosupervisor}
+	\printasssupervisor{\assistantsupervisor}
+	~\\
+	~\\
+	\Large Graduation: {\graddate}\\
+	\LARGE Student number: {\studentnumber}
+\end{tabular}
+\end{adjustbox}
+\end{center}
+}
+
+\clearpage
+
+\changetext{\baselineskip}{0em}{0em}{0em}{50pt}
+
+}
