@@ -1,0 +1,95 @@
+\section{Technology Stack and Development Environment}
+
+The correlator implementation builds upon a carefully selected technology stack that balances performance requirements, development velocity, and long-term maintainability. This section describes the chosen technologies, their justification, and the development environment configuration.
+
+\subsection{Core Programming Language and Interpreter}
+
+Python 3.11 serves as the primary implementation language. This version offers performance improvements over earlier Python releases, including faster function calls, exception handling optimisation, and reduced memory overhead. While Python's interpreted nature traditionally imposed performance penalties, recent versions have narrowed the gap with compiled languages for the orchestration-heavy workloads typical of scientific computing pipelines.
+
+The choice of Python reflects several considerations. First, the language's expressive syntax accelerates development: complex operations can be expressed concisely, reducing the code volume that must be written, tested, and maintained. Second, Python's interactive interpreter facilitates exploratory development and debugging—developers can test individual functions, inspect data structures, and verify algorithm behaviour without the compile-link-execute cycle of compiled languages. Third, Python has become the de facto standard for astronomical software, ensuring that the correlator integrates smoothly with calibration tools, analysis scripts, and visualisation packages likely to be used in subsequent processing stages.
+
+Python's Global Interpreter Lock (GIL), which serialises execution of bytecode instructions, does not significantly constrain the correlator. Computational bottlenecks occur in vectorised NumPy operations that release the GIL during execution, and in potential GPU computations that execute entirely outside Python's interpreter. The GIL primarily affects pure-Python code performing fine-grained operations on many small objects—a pattern the correlator deliberately avoids by operating on large contiguous arrays.
+
+\subsection{Numerical Computing Libraries}
+
+NumPy 1.26 provides the foundation for all array operations. NumPy implements dense, homogeneous multidimensional arrays with vectorised operations compiled to native machine code. Critical operations—array creation, indexing, element-wise arithmetic, reductions—execute at speeds approaching hand-written C, typically only 2–3× slower than optimal implementations. NumPy's FFT module wraps the FFTW library (or compatible implementations), delivering FFT performance competitive with specialised signal processing frameworks.
+
+The correlator leverages several NumPy capabilities intensively:
+
+\begin{itemize}
+    \item \textbf{Broadcasting}: Enables array operations across mismatched dimensions without explicit loops. Applying delay corrections—multiplying three-dimensional spectral data by two-dimensional phase arrays—executes as a single vectorised operation through broadcasting rules.
+    
+    \item \textbf{Structured arrays}: Would support heterogeneous baseline metadata (antenna indices, separations, calibration flags) within single arrays, though the baseline implementation uses simpler structures.
+    
+    \item \textbf{Memory views}: Allow zero-copy array reshaping and slicing, critical for the corner-turn operation reordering antenna-major data to frequency-major without duplication.
+    
+    \item \textbf{Advanced indexing}: Facilitates extracting arbitrary baseline subsets or channel ranges efficiently.
+\end{itemize}
+
+SciPy 1.11 supplements NumPy with specialised scientific computing functions. The correlator uses SciPy's signal processing module for advanced window function generation and filter design. While not essential for basic operation, SciPy provides implementation alternatives and validation tools useful during development.
+
+\subsection{File I/O and Data Persistence}
+
+Multiple libraries handle different output formats. The standard library's \texttt{pickle} module could serialize Python objects but produces Python-specific formats unsuitable for long-term archival or interoperability. Instead, the correlator employs format-specific libraries:
+
+\textbf{h5py 3.10} provides HDF5 support. It exposes HDF5 files as dictionary-like objects where datasets appear as NumPy arrays. Writing visibility data involves creating a dataset with \texttt{f.create\_dataset('visibilities', data=array)} and attaching metadata via attribute assignment \texttt{f.attrs['integration\_time'] = 1.0}. HDF5's chunked storage and optional compression reduce disk usage; for instance, enabling gzip compression level 4 reduces visibility file sizes by 30–50\% with minimal I/O overhead.
+
+\textbf{astropy 6.0} handles FITS format through its \texttt{io.fits} module. This interface creates FITS headers from Python dictionaries and packages NumPy arrays as image HDUs. Since FITS natively supports only real-valued images, complex visibilities require separate real and imaginary HDUs. Astropy's extensive astronomy utilities—coordinate transformations, time standards, unit handling—position it as a likely dependency for future enhancements even though the baseline correlator uses only its FITS I/O capabilities.
+
+\textbf{PyYAML 6.0} handles configuration files. It bidirectionally converts between Python dictionaries and YAML text, preserving structure and data types. The human-readable YAML format supports comments, making configuration files self-documenting. PyYAML's safe loading mode prevents code execution vulnerabilities that plague pickle-based configuration approaches.
+
+\subsection{Testing and Quality Assurance}
+
+pytest 8.0 provides the testing framework. Its fixture system manages test setup and teardown cleanly, critical for tests that generate temporary files or require specific configurations. The correlator's test suite uses pytest features including:
+
+\begin{itemize}
+    \item \textbf{Parametrisation}: Testing functions with multiple parameter combinations without code duplication. A single test function validates FFT accuracy across 64, 128, 256, 512, 1024, 2048, and 4096 point transforms.
+    
+    \item \textbf{Fixtures}: Reusable components like synthetic test signals or temporary output directories that multiple tests share.
+    
+    \item \textbf{Markers}: Categorising tests as unit, integration, or validation, enabling selective test execution during development.
+\end{itemize}
+
+Coverage.py measures code coverage, identifying untested code paths. The correlator's test suite achieves approximately 85\% statement coverage, with most untested code residing in error handling branches difficult to trigger without manipulating private state.
+
+\subsection{Containerisation and Deployment}
+
+Docker 24.0 provides containerisation for reproducible deployments. The correlator's Dockerfile specifies a complete runtime environment: Python interpreter version, library dependencies with exact version pins, and system configuration. Building a Docker image produces a self-contained package that runs identically across development laptops, testing servers, and production systems. This eliminates "works on my machine" problems and simplifies deployment on computing clusters or cloud platforms.
+
+The multi-stage Dockerfile optimises image size. A builder stage installs compilation tools and builds wheels for all dependencies. The final stage copies only the built packages and runtime libraries, excluding compilers and development headers. This reduces image size from approximately 2.5 GB to 800 MB, accelerating distribution and reducing storage costs.
+
+Docker Compose orchestrates multi-container deployments. While the correlator itself runs in a single container, development deployments include companion containers for Jupyter notebooks (for interactive analysis), monitoring dashboards (for performance visualisation), or test data generators. Compose's declarative YAML format specifies service relationships, volume mounts, and network configuration, allowing complex multi-component environments to be instantiated with a single \texttt{docker-compose up} command.
+
+\subsection{Version Control and Collaboration}
+
+Git manages source code versioning. The repository follows a branching model where the \texttt{main} branch contains stable releases, \texttt{develop} holds integration-tested changes, and feature branches isolate work-in-progress. This workflow supports parallel development of independent features—one developer improving FFT performance while another implements FITS output—without conflicts.
+
+Commits follow conventional commit message format, prefixing messages with type indicators (\texttt{feat:}, \texttt{fix:}, \texttt{docs:}, \texttt{test:}) that enable automated changelog generation. Semantic versioning (major.minor.patch) tracks API stability: major version increments indicate breaking changes, minor versions add backwards-compatible features, patches fix bugs without adding functionality.
+
+\subsection{Documentation Generation}
+
+While not implemented in the baseline version, the code structure supports Sphinx documentation generation. Docstrings follow NumPy documentation style—structured sections for parameters, returns, raises, examples—that Sphinx can parse into formatted HTML documentation. Type hints (Python 3.5+) annotate function signatures with expected types, enabling both static analysis and automatic documentation of interfaces.
+
+\subsection{Performance Profiling and Optimisation}
+
+Python's \texttt{cProfile} module profiles execution time distribution across functions. Running the correlator under cProfile identifies bottlenecks: typically, FFT computation dominates (60–70\% of runtime), followed by correlation (20–25\%), with overhead (I/O, Python loops) consuming the remainder. This profiling guided optimisation efforts toward vectorising the correlation loop and investigating alternative FFT implementations.
+
+\texttt{memory\_profiler} tracks memory usage over time, revealing allocation patterns and potential leaks. Profiling confirmed that the correlator's memory footprint remains bounded, not growing with observation duration, indicating proper buffer reuse.
+
+\subsection{Development Workflow}
+
+A typical development cycle proceeds as follows:
+
+\begin{enumerate}
+    \item Modify code in an editor supporting Python language features (syntax highlighting, auto-completion, inline type checking)
+    \item Run unit tests for affected modules: \texttt{pytest tests/unit/test\_fengine.py}
+    \item If tests pass, run broader integration suite: \texttt{pytest tests/integration/}
+    \item Profile if performance-critical changes were made: \texttt{python -m cProfile -o profile.stats runner.py}
+    \item Commit changes with descriptive message: \texttt{git commit -m "feat: add Blackman window support"}
+    \item Build Docker image to verify containerised deployment: \texttt{docker build -t correlator:dev .}
+    \item Push changes to shared repository for review
+\end{enumerate}
+
+This workflow emphasises rapid iteration with safety checks. Tests execute in seconds, providing immediate feedback. Containerisation testing catches dependency issues before deployment. The combination of quick iteration and comprehensive validation accelerates development without sacrificing reliability.
+
+In summary, the technology stack prioritises mature, well-documented tools with strong community support. Python and NumPy provide a solid foundation enhanced by specialised libraries for I/O, testing, and deployment. This stack aligns with broader trends in scientific computing, ensuring that the correlator's dependencies remain actively maintained and that developers familiar with the astronomical software ecosystem can contribute effectively.

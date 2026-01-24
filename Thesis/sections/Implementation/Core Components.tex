@@ -1,0 +1,87 @@
+\section{Core Component Implementation}
+
+This section details implementation of core processing components, focusing on key design decisions and code organisation.
+
+\subsection{Frontend: Data Acquisition Module}
+
+The \texttt{DataSource} base class defines a \texttt{stream(chunk\_size)} generator yielding NumPy arrays shaped \texttt{(n\_ants, chunk\_size)}.
+
+The \texttt{SimulatedStream} class generates synthetic signals:
+
+\begin{verbatim}
+for each chunk:
+    signal = carrier * exp(-2πj * phase_offset) + noise
+    yield signal
+\end{verbatim}
+
+NumPy broadcasting extends the carrier signal across antennas automatically. Phase offsets are computed once at initialisation.
+
+The \texttt{BatchFileSource} loads data once and yields sequential array views (not copies) to minimise memory overhead.
+
+\subsection{F-Engine: Channelization Implementation}
+
+The F-Engine generates windows at initialisation to amortise cost. Processing iterates over antennas and spectral windows:
+
+\begin{verbatim}
+for ant in range(n_ants):
+    for spec in range(n_spectra):
+        windowed = signals[ant, start:end] * self.window
+        output[ant, spec, :] = np.fft.fft(windowed)
+\end{verbatim}
+
+Loop structure prioritises clarity over maximum vectorisation. Profiling showed FFT computation dominates (0.1–0.2 ms per 256-point transform) while loop overhead remains negligible.
+
+\subsection{Delay Engine: Geometric Corrections}
+
+The Delay Engine computes phase corrections from antenna geometry. Setting the phase centre triggers delay calculation using vectorised matrix multiplication:
+
+\begin{verbatim}
+path_diff = ant_positions @ direction
+path_diff -= path_diff[0]  # relative to antenna 0
+current_delays = path_diff / c
+\end{verbatim}
+
+Applying delays uses broadcasting:
+
+\begin{verbatim}
+for ant in range(n_ants):
+    phases = 2 * np.pi * channel_freqs * current_delays[ant]
+    phasor = np.exp(-1j * phases)
+    corrected[ant, :, :] *= phasor[np.newaxis, :]  # broadcast
+\end{verbatim}
+
+Phase correction consumes under 5\% of runtime, making further optimisation unnecessary.
+
+\subsection{X-Engine: Correlation and Integration}
+
+Initialisation computes baseline list (autocorrelations first, then cross-correlations) and integration parameters. Correlating a single spectrum:
+
+\begin{verbatim}
+for bl_idx, (i, j) in enumerate(baselines):
+    if i == j:
+        vis[bl_idx, :] = np.abs(channelized[i, :])**2
+    else:
+        vis[bl_idx, :] = channelized[i, :] * np.conj(channelized[j, :])
+\end{verbatim}
+
+Accumulation sums contributions until integration completes, then averages and resets. Autocorrelations are forced to real values to eliminate numerical noise from finite precision.
+
+\subsection{Output Formatting and Configuration}
+
+Format-specific writers handle NumPy, HDF5, and FITS outputs. HDF5 adds metadata through attributes; FITS separates complex data into real/imaginary HDUs. Missing libraries trigger graceful fallback to NumPy format.
+
+The \texttt{CorrelatorConfig} dataclass uses type annotations and \texttt{\_\_post\_init\_\_} validation:
+
+\begin{verbatim}
+@dataclass
+class CorrelatorConfig:
+    n_ants: int = 4
+    n_channels: int = 256
+    ...
+    
+    def __post_init__(self):
+        if not is_power_of_two(self.n_channels):
+            raise ValueError("n_channels must be power of 2")
+\end{verbatim}
+
+YAML serialization converts dataclass fields to dictionaries, handling NumPy arrays by converting to nested lists.

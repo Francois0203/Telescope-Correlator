@@ -1,0 +1,95 @@
+\section{Data Structures and Format Specifications}
+
+The correlator employs structured data representations that balance memory efficiency, computational convenience, and compatibility with external tools. This section documents the data structures used throughout the processing pipeline and the formats for persistent storage.
+
+\subsection{Internal Data Representations}
+
+All internal array operations use NumPy's ndarray structure, which provides efficient storage, vectorised operations, and seamless integration with scientific Python libraries. Array dimensions follow consistent conventions throughout the codebase to prevent indexing errors and facilitate code comprehension.
+
+\textbf{Time-Domain Data}: Voltage samples from antennas are stored as two-dimensional arrays with shape \texttt{(n\_antennas, n\_samples)}. The first dimension indexes antennas ($0$ to $M-1$), the second indexes time samples within a chunk. The data type is \texttt{complex128} (64-bit complex numbers), providing adequate numerical precision for correlation while avoiding excessive memory consumption. For a four-antenna system with 4096-sample chunks, each chunk occupies $4 \times 4096 \times 16 = 262{,}144$ bytes (256 KB).
+
+\textbf{Frequency-Domain Data}: Channelized spectra are three-dimensional arrays with shape \texttt{(n\_antennas, n\_spectra, n\_channels)}. The first dimension indexes antennas, the second indexes successive time windows (spectra) produced from one chunk, and the third indexes frequency channels. Again, \texttt{complex128} type is used. The number of spectra depends on the chunk size, FFT size, and overlap factor; for non-overlapping 256-point FFTs processing 4096 samples, one obtains $\lfloor 4096 / 256 \rfloor = 16$ spectra. A typical channelized data array (4 antennas, 16 spectra, 256 channels) requires $4 \times 16 \times 256 \times 16 = 262{,}144$ bytes—identical to the input chunk size, reflecting conservation of information through the Fourier transform.
+
+\textbf{Visibility Data}: Correlation products are two-dimensional arrays with shape \texttt{(n\_baselines, n\_channels)}. The first dimension indexes baselines in the canonical ordering described previously, the second indexes frequency channels. The data type remains \texttt{complex128}, though autocorrelations contain only real values. For a four-antenna system with 256 channels, each integration's visibility array requires $10 \times 256 \times 16 = 40{,}960$ bytes (40 KB).
+
+These representations prioritise memory layout efficiency. NumPy arrays use row-major (C-contiguous) storage by default, meaning that elements consecutive in the last dimension are adjacent in memory. This layout optimises cache performance when processing operations iterate over frequency channels, as occurs in both delay compensation and correlation.
+
+\subsection{Configuration Data Structure}
+
+The \texttt{CorrelatorConfig} dataclass encapsulates all system parameters in a single object. It includes:
+
+\begin{itemize}
+    \item \textbf{Array parameters}: \texttt{n\_ants} (antenna count), \texttt{ant\_positions} (optional array of coordinates), \texttt{ant\_radius} (for auto-generated circular arrays)
+    \item \textbf{Signal parameters}: \texttt{sample\_rate} (Hz), \texttt{center\_freq} (Hz)
+    \item \textbf{F-engine parameters}: \texttt{n\_channels} (FFT size), \texttt{window\_type} (string), \texttt{quantize\_bits} (integer), \texttt{overlap\_factor} (float 0–0.5)
+    \item \textbf{X-engine parameters}: \texttt{integration\_time} (seconds)
+    \item \textbf{Data source parameters}: \texttt{data\_source} (enumeration), \texttt{input\_file} (path string)
+    \item \textbf{Simulation parameters}: \texttt{sim\_duration}, \texttt{sim\_snr}, \texttt{sim\_source\_angles} (list of radians)
+    \item \textbf{Delay parameters}: \texttt{enable\_delays} (boolean), \texttt{phase\_center} (unit vector)
+    \item \textbf{Output parameters}: \texttt{output\_dir} (path), \texttt{output\_format} (enumeration), \texttt{save\_channelised} (boolean)
+    \item \textbf{Runtime parameters}: \texttt{chunk\_size} (samples), \texttt{max\_integrations} (integer or null)
+\end{itemize}
+
+The dataclass provides default values for all fields, enabling partial configuration where only non-default parameters need specification. It also includes validation logic in a \texttt{\_\_post\_init\_\_} method that checks parameter consistency—for example, verifying that \texttt{n\_channels} is a power of two and that file paths exist when required.
+
+Configuration serialization uses YAML format, a human-readable text format supporting nested structures and comments. The \texttt{CorrelatorConfig} class provides \texttt{from\_yaml()} and \texttt{to\_yaml()} methods that load and save configurations. This enables:
+
+\begin{itemize}
+    \item Version-controlled configuration files in the code repository
+    \item Reproducibility by saving the exact configuration alongside output data
+    \item Easy parameter modification without code changes
+    \item Template configurations for common observing modes
+\end{itemize}
+
+\subsection{Output Data Formats}
+
+The correlator supports three output formats, selected via the \texttt{output\_format} configuration parameter.
+
+\textbf{NumPy Binary Format} (\texttt{.npy}): The simplest format uses NumPy's native binary serialization. Each integration's visibility array is saved as a separate \texttt{.npy} file using \texttt{numpy.save()}. Files are named sequentially (e.g., \texttt{visibility\_0001.npy}, \texttt{visibility\_0002.npy}). This format offers fast I/O and immediate accessibility in Python but lacks metadata support and is not recognised by external astronomy software. It serves primarily for quick-look analysis and algorithm development.
+
+\textbf{Hierarchical Data Format 5} (\texttt{.h5}): The HDF5 format, accessed through the \texttt{h5py} library, provides hierarchical organisation and metadata storage. Each integration's visibility array is stored as a dataset within an HDF5 file. Attributes attached to the dataset record dimensions, data type, observation time, and configuration parameters. Multiple integrations can reside in a single HDF5 file (organised by integration number) or in separate files as preferred. HDF5's chunked storage and optional compression reduce disk space for large datasets. The format is widely supported across scientific computing platforms and radio astronomy tools.
+
+\textbf{Flexible Image Transport System} (\texttt{.fits}): The FITS format, standard in astronomy, is supported through the \texttt{astropy.io.fits} module. Since FITS images natively support only real-valued data, complex visibilities are stored as two separate image extensions: one for real components, one for imaginary components. A primary HDU contains metadata in the FITS header (observation parameters, antenna positions, frequency channels). FITS files integrate directly with CASA, AIPS, and other radio astronomy calibration packages, facilitating downstream analysis.
+
+All formats include a separate configuration file saved alongside visibility data. This ensures complete reproducibility: given the saved configuration and the input data (or simulation seed), the exact processing can be repeated to regenerate identical outputs.
+
+\subsection{Metadata and Provenance}
+
+Each output file or dataset includes provenance metadata documenting its origin:
+
+\begin{itemize}
+    \item \textbf{Temporal information}: Integration start time, duration, number of averaged spectra
+    \item \textbf{Spectral information}: Channel count, channel width, frequency range
+    \item \textbf{Array information}: Number of antennas, baseline indices, antenna positions
+    \item \textbf{Processing information}: Software version, configuration parameters, delay model used
+\end{itemize}
+
+For HDF5 and FITS outputs, this metadata is embedded in file structures (HDF5 attributes, FITS headers). For NumPy outputs, a companion YAML file contains the metadata dictionary.
+
+Comprehensive metadata enables several capabilities:
+
+\begin{itemize}
+    \item Calibration software can extract array geometry and frequency information
+    \item Data quality assessment tools can identify outlier integrations
+    \item Archival systems can index and search observations by parameter
+    \item Publications can cite exact processing parameters for reproducibility
+\end{itemize}
+
+The metadata design follows the principle that outputs should be self-describing: examining an output file alone suffices to understand how it was produced, without requiring external documentation or institutional knowledge.
+
+\subsection{Intermediate Data Products}
+
+When \texttt{save\_channelised} is enabled, the correlator optionally saves intermediate F-engine outputs. Channelized data from all processed chunks is concatenated into a single large array and saved as \texttt{channelised.npy}. This multi-gigabyte array has shape \texttt{(n\_chunks, n\_antennas, n\_spectra, n\_channels)} and captures the full time-frequency representation before correlation.
+
+Saving channelized data serves several purposes:
+
+\begin{itemize}
+    \item Enables post-hoc delay model adjustments without re-running FFTs
+    \item Facilitates beamforming experiments by coherently combining antennas
+    \item Supports spectral analysis independent of correlation
+    \item Allows validation that channelization produces expected spectra
+\end{itemize}
+
+However, the large storage requirements (hundreds of megabytes to gigabytes per observation) mean this option is typically disabled for routine operations and enabled only for commissioning or special studies.
+
+In summary, the correlator's data structures and formats reflect careful consideration of computational efficiency, storage practicality, and integration with the broader radio astronomy software ecosystem. NumPy arrays provide the computational substrate, YAML files supply human-editable configuration and metadata, and multiple output formats accommodate different downstream analysis workflows.

@@ -1,0 +1,151 @@
+\section{Deployment Infrastructure}
+
+\subsection{Docker Containerization}
+
+Docker isolates the runtime environment. The Dockerfile specifies Python 3.11, installs dependencies, copies source, and creates a \texttt{correlator} command:
+
+\begin{verbatim}
+FROM python:3.11-slim
+COPY requirements.txt /app/
+RUN pip install -r requirements.txt
+COPY app/src/ /app/src/
+RUN pip install /app/src/
+\end{verbatim}
+
+The volume mount (\texttt{-v}) maps the host's workspace directory into the container at \texttt{/workspace}, enabling the correlator to read input files and write outputs that persist after container termination. The \texttt{--rm} flag automatically removes the container after execution, preventing accumulation of stopped containers.
+
+Docker Compose orchestrates multi-container deployments. The \texttt{docker-compose.yml} file defines services:
+
+\begin{verbatim}
+services:
+  correlator:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    image: telescope-correlator:latest
+    volumes:
+      - ./workspace:/workspace
+    stdin_open: true
+    tty: true
+    command: ["python", "-m", "correlator", "dev"]
+
+  test:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    volumes:
+      - .:/workspace
+    command: ["pytest", "tests_harness/", "-v"]
+\end{verbatim}
+
+This configuration defines separate services for interactive correlation and testing. Users launch the interactive correlator with:
+
+\begin{verbatim}
+docker-compose run correlator
+\end{verbatim}
+
+Or execute tests with:
+
+\begin{verbatim}
+docker-compose run test
+\end{verbatim}
+
+Compose manages container lifecycle, network creation, and volume mounting automatically, simplifying deployment especially for users unfamiliar with Docker command-line syntax.
+
+\subsection{Dependency Management and Version Control}
+
+The \texttt{requirements.txt} file pins all dependencies to specific versions:
+
+\begin{verbatim}
+numpy==1.26.0
+scipy==1.11.0
+matplotlib==3.8.0
+pyyaml==6.0.1
+pytest==8.0.0
+h5py==3.10.0
+astropy==6.0.0
+\end{verbatim}
+
+Version pinning ensures reproducibility: builds from the same source tree produce identical environments regardless of when or where they execute. Without pinning, installing "latest numpy" might yield different versions over time, introducing subtle behavioural changes or incompatibilities. The trade-off is that pinned versions require periodic updates to incorporate bug fixes and performance improvements, but this maintenance burden is preferable to unpredictable environment drift.
+
+The Dockerfile specifies the Python interpreter version explicitly (\texttt{python:3.11-slim}), completing the dependency specification. Combined with pinned package versions, this produces bit-for-bit identical environments across deployments.
+
+Version control tracks both code and dependency specifications. The Git repository includes:
+
+\begin{itemize}
+    \item All source code in \texttt{app/src/}
+    \item Test suites in \texttt{tests\_harness/}
+    \item Configuration templates in \texttt{workspace/configs/}
+    \item Deployment specifications (Dockerfile, docker-compose.yml)
+    \item Dependency manifests (requirements.txt)
+\end{itemize}
+
+Tags mark releases: \texttt{v1.0.0}, \texttt{v1.1.0}, etc. Tagging enables precise reconstruction of historical versions for reproducibility or regression investigation. Users can checkout a specific tag and build its container image, obtaining the exact software state at that release.
+
+\subsystem{Platform Portability}
+
+The containerized deployment supports multiple platforms. Docker runs on Linux, macOS, and Windows, providing consistent behaviour across operating systems. Platform-specific differences—file path conventions, line endings, available system libraries—are abstracted by the container environment. The same Docker image executes identically whether built on a researcher's MacBook, deployed to a Linux server, or tested in a Windows environment.
+
+Portability extends to hardware. The Python/NumPy implementation executes on any architecture supporting these dependencies—x86-64 servers, ARM-based systems, or cloud instances. While performance varies with processor capabilities, functional behaviour remains consistent. This architecture-independence contrasts with FPGA or GPU implementations tightly coupled to specific hardware, trading absolute performance for deployment flexibility.
+
+\subsection{Operational Documentation and User Guides}
+
+Comprehensive documentation supports operational deployment. The repository includes:
+
+\textbf{README.md}: Provides quick-start instructions, installation procedures, and basic usage examples. New users begin here to assess system requirements, install dependencies, and execute their first correlation within minutes.
+
+\textbf{ARCHITECTURE.md}: Documents system design, component interactions, and algorithmic details. Developers modifying or extending the correlator consult this document to understand design rationale and implementation patterns.
+
+\textbf{Configuration templates}: Example YAML files in \texttt{workspace/configs/} demonstrate common observing modes. Users adapt these templates rather than creating configurations from scratch, reducing setup time and configuration errors.
+
+\textbf{Inline code documentation}: Docstrings within source code describe function interfaces, parameter meanings, and return values. Developers using the correlator as a library reference these docstrings through Python's \texttt{help()} function or IDE tooltips.
+
+This multi-level documentation addresses different audiences: README for users, ARCHITECTURE for developers, templates for operators, and docstrings for programmers. The layered approach prevents documentation overload while ensuring information availability at appropriate detail levels.
+
+\subsection{Operational Workflows and Best Practices}
+
+Typical operational workflows emerge from deployment experience:
+
+\textbf{Initial setup}: Clone repository, build Docker image, verify installation by running test suite. This sequence ensures the environment functions correctly before attempting real observations.
+
+\textbf{Observation processing}: Prepare configuration file specifying observation parameters, place input data in workspace, execute correlator with configuration, inspect outputs for quality, archive outputs and configuration for permanent storage.
+
+\textbf{Parameter tuning}: Load previous configuration as starting point, adjust parameters based on observation requirements, test with small data subset, run full processing once parameters validated.
+
+\textbf{Batch processing}: Generate configuration files for observation sequence, write script iterating over configurations, execute script with monitoring to detect failures, post-process outputs collectively.
+
+These workflows embody lessons learned during initial deployments. Documenting them guides new operators toward effective practices and away from known pitfalls (like forgetting to save configurations alongside outputs, complicating later reproducibility).
+
+\subsection{Performance Monitoring and Resource Management}
+
+Operational deployment requires attention to resource utilisation. The containerized correlator can be monitored using standard Docker tools:
+
+\begin{verbatim}
+docker stats correlator
+\end{verbatim}
+
+This command reports CPU usage, memory consumption, and I/O statistics in real time. Operators observe these metrics to detect performance issues: sustained high CPU might indicate computational bottlenecks, while high memory usage could suggest inefficient buffering or memory leaks (though extensive testing revealed no leaks in the baseline implementation).
+
+Resource limits can be imposed through Docker:
+
+\begin{verbatim}
+docker run --memory=4g --cpus=2 ...
+\end{verbatim}
+
+These constraints prevent a single correlator instance from monopolising shared resources on multi-user systems. Memory limits particularly matter when processing large datasets or long integrations that accumulate substantial output.
+
+\subsection{Backup, Archival, and Data Management}
+
+Observation outputs require systematic management. Recommended practices include:
+
+\textbf{Immediate backup}: Copy outputs from workspace to permanent storage (network-attached storage, archival systems) immediately after correlation completes, before workspace cleanup.
+
+\textbf{Configuration bundling}: Store configuration files alongside outputs, ensuring reproducibility. A directory structure like \texttt{observation\_ID/config.yaml} and \texttt{observation\_ID/visibilities/} keeps related files together.
+
+\textbf{Metadata logging}: Maintain observation logs recording timestamp, observer, source name, configuration used, and output locations. This log enables later searches and retrieval.
+
+\textbf{Periodic validation}: Randomly re-correlate archived observations to verify that software upgrades haven't introduced regressions. Comparing new outputs with original outputs detects unintended behavioural changes.
+
+These practices transform the correlator from a standalone tool into a component of a larger data management ecosystem, ensuring that scientific data remains accessible and trustworthy over the observatory's operational lifetime.
+
+In summary, deployment infrastructure establishes the correlator as production-ready software through containerisation, dependency management, documentation, and operational best practices. The Docker-based deployment provides reproducible environments suitable for local development, shared servers, and cloud platforms, while comprehensive documentation and example workflows lower barriers to adoption and effective use.

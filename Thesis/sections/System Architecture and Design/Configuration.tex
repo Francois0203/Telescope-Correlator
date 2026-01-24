@@ -1,0 +1,83 @@
+\section{Configuration Management and Operational Modes}
+
+The correlator system adapts to diverse operational requirements through a flexible configuration framework and multiple operational modes. This design accommodates use cases ranging from algorithm development with synthetic data to processing real observations from the telescope array.
+
+\subsection{Hierarchical Configuration System}
+
+Configuration parameters flow into the system through a three-tier hierarchy: default values defined in code, values loaded from YAML files, and values specified via command-line arguments. This hierarchy balances convenience for routine operations with flexibility for specialised applications.
+
+\textbf{Default values} are embedded in the \texttt{CorrelatorConfig} dataclass definition. These defaults represent sensible choices for typical observations: four antennas, 256 channels, 1024 Hz sample rate, 1-second integration, Hanning window. A user can instantiate a config object without arguments and obtain a functional configuration suitable for basic correlation. This ensures that the system remains operational even without configuration files, critical for initial testing and demonstration.
+
+\textbf{YAML configuration files} provide persistent parameter sets for different observing modes. An observatory might maintain separate YAML files for spectral line observations (requiring many channels and narrow bandwidth), continuum surveys (fewer channels but wide bandwidth), or pulsar timing (precise time resolution). Loading a configuration file overrides defaults for specified parameters while leaving unspecified parameters at their defaults. For example, a spectral line configuration might specify \texttt{n\_channels: 4096} and \texttt{window\_type: blackman} while accepting default integration time and output format.
+
+\textbf{Command-line arguments} provide the highest precedence, overriding both defaults and file-loaded values. This enables quick parameter adjustment for individual runs without editing configuration files. For instance, an operator might load the standard spectral line configuration but override \texttt{integration\_time} for a test observation: \texttt{correlator dev run --config spectral.yaml --integration-time 0.5}.
+
+This three-tier approach mirrors common practice in scientific software and supports natural workflows. Standard configurations reside in version control, shared among users and updated as best practices evolve. Individual users create personal configuration files for specific projects without modifying system defaults. Command-line overrides facilitate scripting and experimentation.
+
+\subsection{Operational Mode Distinction}
+
+The correlator distinguishes between development and production operational modes, each optimised for different contexts.
+
+\textbf{Development mode} targets algorithm development, system testing, and education. It generates synthetic antenna signals rather than requiring physical hardware or recorded observations. Users specify source positions, signal-to-noise ratio, and simulation duration; the system generates time series exhibiting realistic interferometric properties. Development mode enables:
+
+\begin{itemize}
+    \item Algorithm validation against known analytical solutions
+    \item Parameter space exploration without consuming telescope resources
+    \item Educational demonstrations of interferometric principles
+    \item Regression testing during code development
+\end{itemize}
+
+Simulated signals incorporate realistic noise, multiple sources at configurable sky positions, and proper phasing consistent with antenna geometry. The simulator uses a random number generator with configurable seed, ensuring reproducible test cases. By varying the seed, developers can assess performance across different noise realisations while maintaining deterministic results for any given seed.
+
+\textbf{Production mode} processes actual telescope data. It accepts recorded observations as NumPy arrays containing voltage samples from digitisers or, in future versions, may accept real-time network streams. Production mode incorporates additional features relevant to real observations:
+
+\begin{itemize}
+    \item Network streaming protocols for data acquisition
+    \item Time-stamping and synchronisation mechanisms
+    \item Quality assurance checks (sample rate stability, clock alignment)
+    \item Integration with telescope control systems
+\end{itemize}
+
+The mode selection occurs at the top level of the command-line interface. Users invoke either \texttt{correlator dev} or \texttt{correlator prod}, establishing the operational context before specifying additional parameters. This clear separation prevents accidental mixing of simulation and observation processing, which could lead to confusion in interpreting results.
+
+\subsection{Data Source Abstractions}
+
+Within both modes, the system abstracts data sources through a common interface. The \texttt{DataSource} base class defines a \texttt{stream()} method that yields successive chunks of antenna data. Concrete implementations include:
+
+\textbf{SimulatedStream}: Generates synthetic signals on-the-fly. Parameters include source angles (in radians from zenith), signal frequency, SNR, and total duration. The generator can optionally introduce realistic timing by sleeping between chunks to simulate real-time streaming. This mode consumes negligible storage—data exists only transiently in memory—and runs indefinitely if no duration limit is set.
+
+\textbf{BatchFileSource}: Reads recorded data from disk. Given a file path, it loads the complete NumPy array, validates dimensions, and yields sequential chunks. This mode suits offline processing of observations, enabling repeated analysis with different correlation parameters without requiring antenna access. Large files are handled by memory-mapping techniques if available, though the baseline implementation loads data entirely into memory.
+
+\textbf{NetworkStreamSource} (future): Would connect to telescope digitiser outputs via TCP or UDP sockets, receiving packetised voltage samples in real time. Implementation would include buffering to handle network jitter, packet loss detection, and timestamp validation. While not implemented in the initial version, the interface design anticipates this capability.
+
+This abstraction isolates the correlation pipeline from data acquisition details. The F-Engine and subsequent stages receive data through the same interface regardless of origin, simplifying pipeline logic and facilitating testing—developers can validate correlation correctness using simulated data before attempting real observations.
+
+\subsection{Configuration Validation and Error Prevention}
+
+The configuration system incorporates multiple validation stages to detect errors before processing begins. Validation occurs at several checkpoints:
+
+\textbf{At instantiation}: When a \texttt{CorrelatorConfig} object is created, its \texttt{\_\_post\_init\_\_} method validates parameter ranges and consistency. It checks that antenna count is at least two, that channel count is a power of two (required for FFT efficiency), and that integration time is positive. If validation fails, the constructor raises a \texttt{ValueError} with a descriptive error message indicating which parameter is invalid and why.
+
+\textbf{At component initialisation}: When components like the F-Engine or X-Engine are created, they verify that their configuration parameters match their capabilities. For example, the X-Engine confirms that the configured channel count matches the dimension of spectral data it will receive. These checks catch mismatches between configuration and data.
+
+\textbf{At runtime}: During processing, components validate input dimensions. If the F-Engine receives a chunk with the wrong number of antennas, it immediately raises an exception rather than proceeding with undefined behaviour. This fail-fast principle ensures that configuration errors are detected at their source rather than propagating through the pipeline to produce subtly incorrect results.
+
+Error messages are designed to be actionable. Rather than generic exceptions, the system raises specific errors with context: "n\_channels must be a power of 2, got 300" is more helpful than "invalid configuration." Where appropriate, messages suggest corrections: "To use 300 channels, round up to 512."
+
+\subsection{Parameter Interdependencies}
+
+Some parameter choices constrain others. The configuration system makes these interdependencies explicit:
+
+The integration time and FFT size jointly determine the number of spectra per integration. Given sample rate $f_s$, FFT size $N$, and integration time $t_{\text{int}}$, the system must accumulate at least $\lceil t_{\text{int}} f_s / N \rceil$ spectra. If the requested integration time is not an exact multiple of the spectrum duration, the actual integration time will be slightly longer. The configuration reports the actual value used, avoiding silent rounding that might confuse users.
+
+Overlap processing increases the data rate between F-Engine and X-Engine. With overlap factor $\alpha$, the number of spectra per chunk increases by $1/(1-\alpha)$. For $\alpha = 0.25$ (25\% overlap), the X-Engine receives 33\% more spectra to process. The configuration warns if high overlap combined with many channels might exceed available memory or computational capacity.
+
+Quantisation and output format interact: quantised data (low bit depth) is typically stored in compressed formats to realise storage savings. The configuration system notes when saving quantised intermediate products without compression wastes the quantisation benefit.
+
+\subsection{Documentation and Discoverability}
+
+Every configuration parameter includes inline documentation describing its purpose, valid range, units, and effect on system behaviour. The command-line interface exposes this documentation through a \texttt{--help} option that lists all parameters with their descriptions and defaults. Interactive mode provides parameter inspection: users can query the current configuration, display documentation for specific parameters, and receive suggestions for typical values.
+
+Configuration templates are distributed with the software for common scenarios: wideband continuum observations, high-resolution spectral line studies, pulsar timing experiments, and commissioning tests. These templates serve as starting points that users adapt to their requirements, accelerating the learning curve for new operators.
+
+In summary, the configuration management system balances ease of use for routine operations with the flexibility required for diverse scientific applications. Hierarchical configuration, operational mode separation, data source abstraction, rigorous validation, and comprehensive documentation collectively ensure that the correlator remains accessible to novice users while supporting expert control over all processing parameters.

@@ -1,2 +1,29 @@
 \chapter{Conclusion}
-    This is the conclusion
+
+This research developed an accessible Python-based FX correlator for the Nooitgedacht radio telescope, demonstrating that high-level languages can provide scientifically valid correlation while maintaining transparency for research and education.
+
+\section{Contributions and Objectives}
+
+Key contributions: functional software correlator with phase accuracy $< 0.2^\circ$ and amplitude accuracy $< 1\%$; modular architecture separating Frontend, F-Engine, Delay, and X-Engine components; dual-mode operation (simulated/production); YAML configuration management; and comprehensive documentation.
+
+All research objectives achieved: FX architecture designed following established principles adapted for Python; full implementation in Python 3.11 leveraging NumPy/SciPy/Astropy; accuracy validated against analytical solutions; performance assessed at 1.7$\times$ real-time for baseline configuration; operational deployment enabled through Docker containerization and CLI interfaces.
+
+\section{Significance and Limitations}
+
+The work demonstrates Python viability for small-array correlation, provides an educational resource with transparent implementation, establishes modular design patterns for instrument development, and enables Nooitgedacht interferometric observations.
+
+Limitations include narrow field of view (single phase centre), incomplete polarization (XX/YY only), no integrated calibration, marginal real-time performance for large arrays, and data format compatibility requiring conversion.
+
+Future development directions: implement wide-field multi-beam capability, add cross-polarization products for full Stokes parameters, integrate calibration routines, optimize through GPU acceleration, enhance output format compatibility (UVFITS/measurement sets), and develop adaptive algorithms.
+
+\section{Broader Impact and Methodology}
+
+Broader contributions: democratizing radio astronomy through accessible tools, advancing software-defined instrumentation, supporting open science practices, and demonstrating interdisciplinary methodology combining astronomy with software engineering.
+
+Design Science Research methodology proved effective for iterative correlator development, with evaluation rigour providing objective correctness metrics. Challenges arose in balancing comprehensiveness against resource constraints, leading to prioritisation of analytical validation over exhaustive parameter exploration.
+
+\section{Concluding Remarks}
+
+This research successfully developed a functional, accurate FX correlator for the Nooitgedacht array. The Python implementation achieves scientific validity while maintaining transparency for education and research. Key insights: Python is viable for small-array correlation, modular architectures improve maintainability, Design Science Research guides instrument development effectively, and comprehensive testing builds justified confidence.
+
+The correlator enables Nooitgedacht to conduct interferometric observations, measuring source positions, flux densities, and brightness distributions. Validated accuracy ensures scientifically credible results. The system is operationally ready, transitioning from development to scientific operation—transforming concepts into infrastructure that serves astronomy.

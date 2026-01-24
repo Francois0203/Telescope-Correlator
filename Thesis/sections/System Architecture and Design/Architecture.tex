@@ -1,0 +1,31 @@
+\section{Pipeline Architecture and Component Interfaces}
+
+The correlator implements five sequential processing stages: data ingestion (Frontend), channelization (F-Engine), delay compensation, cross-correlation (X-Engine), and output formatting. Each stage transforms structured input into output for the next stage.
+
+\subsection{Pipeline Stages}
+
+The \textbf{Frontend} handles data acquisition from files or simulated sources, delivering chunks of 4096–8192 samples shaped (antennas, samples). For simulation, it generates synthetic point sources with configurable parameters.
+
+The \textbf{F-Engine} applies window functions (Hanning, Hamming, Blackman, or rectangular) before computing FFTs, producing three-dimensional spectra (antennas, spectra, channels). Overlapping windows increase temporal resolution at computational cost.
+
+The \textbf{Delay Engine} computes geometric delays from antenna positions and phase centre, multiplying spectra by complex exponentials $\exp(-2\pi j f \tau)$ to stop fringes and align phase centres.
+
+The \textbf{X-Engine} computes cross-correlations between all antenna pairs for each channel. For $M$ antennas, this produces $M(M+1)/2$ baseline products per channel. It accumulates products until reaching integration time, then outputs time-averaged visibilities.
+
+The \textbf{Output Formatter} writes visibilities in NumPy, HDF5, or FITS formats with configuration metadata for reproducibility.
+
+\subsection{Data Flow and Buffering}
+
+Data streams through the pipeline in chunks. The Frontend yields chunks iteratively, which immediately enter the F-Engine. The F-Engine processes chunks independently, maintaining minimal state for overlapping windows. The Delay Engine applies fixed phase corrections per chunk. The X-Engine accumulates state across chunks, writing integrated visibilities when reaching the integration period, then resetting accumulators.
+
+Buffer management reuses pre-allocated arrays across chunks to avoid allocation overhead and garbage collection pressure, improving throughput stability.
+
+\subsection{Component Interfaces}
+
+Interfaces use Python methods with documented signatures. The Frontend's \texttt{stream()} generator yields NumPy arrays incrementally. The F-Engine's \texttt{process\_chunk()} accepts time-domain arrays and returns frequency-domain spectra. The X-Engine separates \texttt{correlate\_spectrum()} and \texttt{accumulate()} methods, with \texttt{is\_ready()} and \texttt{get\_integrated()} managing integration timing.
+
+Configuration parameters pass through a \texttt{CorrelatorConfig} dataclass that encapsulates settings and validates consistency. Error handling fails fast with informative messages when receiving unexpected data dimensions.
+
+\subsection{Control Flow and Orchestration}
+
+A central runner instantiates components from configuration and orchestrates the pipeline loop: request chunk, channelize, apply delays, correlate and accumulate each spectrum, write when integration completes. Command-line and interactive interfaces translate user input into configuration objects and invoke the runner.

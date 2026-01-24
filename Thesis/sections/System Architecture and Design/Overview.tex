@@ -1,0 +1,21 @@
+\section{System Overview and Design Philosophy}
+
+The correlator architecture follows a modular design principle: decomposing correlation into independent, testable components with well-defined interfaces. This enables separate development and validation of each processing stage while maintaining system coherence.
+
+The four-element Nooitgedacht array (six baselines) has modest computational demands compared to large interferometers, permitting software-based correlation without specialised hardware. The 3.7-metre dishes at L-band target radio sources, pulsars, and spectral lines where moderate angular resolution suffices.
+
+Key requirements include processing dual-polarisation signals from four antennas with 125 MHz bandwidth and configurable spectral resolution. The system accepts standard data formats and produces outputs compatible with analysis tools, using commodity x86 hardware.
+
+The FX architecture efficiently handles 256–4096 frequency channels, reducing computational complexity from $\mathcal{O}(NK)$ (XF) to $\mathcal{O}(N\log K + M^2K)$ through FFT advantages over time-domain convolution.
+
+Python was selected for its expressive syntax, extensive scientific ecosystem (NumPy, SciPy, h5py, astropy), and astronomy community integration. While pure Python cannot match compiled language performance, delegating computation to optimised libraries (NumPy, potentially CuPy) achieves adequate throughput while maintaining development velocity. Python orchestrates data flow between high-performance kernels rather than performing intensive calculations directly.
+
+The layered architecture comprises: data acquisition (file or network I/O), core correlation pipeline (channelization, delay compensation, cross-multiplication, integration), and management tier (configuration, scheduling, output, monitoring). This separation enables independent tier validation.
+
+YAML configuration files specify parameters (antenna count, channels, integration time, output options), enabling multiple observation modes without code modification.
+
+Data flows through the pipeline in chunks: channelization produces three-dimensional frequency spectra (antenna × time × channel), delay correction applies phase corrections, and correlation accumulates baseline products until completing integration periods, then writes visibilities to disk.
+
+Input validation and runtime checks ensure parameter constraints (channels as power-of-two, positive integration time, dimensional consistency), producing diagnostic messages when errors occur. The modular design supports future extensions through configuration adjustments or module additions rather than code restructuring, including GPU acceleration via CuPy substitution.
+
+The architecture balances performance, flexibility, and maintainability, achieving adequate throughput while enabling rapid development and serving as a platform for algorithm development and education.
