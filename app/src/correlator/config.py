@@ -1,179 +1,64 @@
-"""Configuration Management
-
-Handles correlator configuration with sensible defaults and validation.
-Supports loading from YAML files or programmatic configuration.
-Supports both development (simulation) and production (real telescope) modes.
-"""
+"""Correlator configuration."""
 from __future__ import annotations
-
-import yaml
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Literal
-from dataclasses import dataclass, field, asdict
 import numpy as np
-
-
-WindowType = Literal["rectangular", "hanning", "hamming", "blackman"]
-OperationMode = Literal["development", "production"]
-DataSource = Literal["simulated", "file", "network_stream", "message_queue"]
-StreamProtocol = Literal["tcp", "udp", "spead", "zeromq"]
+import yaml
 
 
 @dataclass
-class CorrelatorConfig:
-    """Complete correlator configuration.
-    
-    Supports two operation modes:
-    - development: For simulations, testing, and learning
-    - production: For real telescope data processing
-    """
-    
-    # Operation mode (fundamental setting)
-    operation_mode: OperationMode = "development"
-    
-    # Array configuration
+class Config:
+    # Array
     n_ants: int = 4
-    ant_positions: Optional[np.ndarray] = None  # If None, use uniform circle
-    ant_radius: float = 10.0  # For auto-generated positions (meters)
-    
-    # Signal parameters
-    sample_rate: float = 1024.0  # Hz (samples per second)
-    center_freq: float = 1.42e9  # Hz (1.42 GHz - HI line, realistic default)
-    
-    # F-engine (channeliser)
-    n_channels: int = 256
-    window_type: WindowType = "hanning"
-    quantize_bits: int = 0  # 0 = no quantization, 8/16 for real systems
-    overlap_factor: float = 0.0  # 0.0 to 0.5 (0.5 = 50% overlap)
-    
-    # X-engine (correlator)
-    integration_time: float = 1.0  # seconds per integration
-    
-    # Data source
-    data_source: DataSource = "simulated"
-    # Backwards-compatible alias used by CLI and tests
-    mode: Literal["simulated", "file"] = "simulated"
-    input_file: Optional[str] = None  # For file-based processing
-    
-    # Network streaming (production mode)
-    stream_protocol: StreamProtocol = "tcp"
-    stream_address: str = "localhost:7148"  # host:port
-    stream_buffer_size: int = 10485760  # 10 MB buffer
-    stream_timeout: float = 5.0  # seconds
-    
-    # Simulation parameters (development mode only)
-    sim_source_angles: list[float] = field(default_factory=lambda: [0.0, np.pi/6])
-    sim_freq: float = 1.0  # Arbitrary units for simulation
-    sim_snr: float = 20.0  # dB
-    sim_duration: float = 10.0  # seconds
-    sim_realtime: bool = False  # Simulate real-time streaming delays
-    
-    # Delay compensation
-    enable_delays: bool = True
-    phase_center: list[float] = field(default_factory=lambda: [1.0, 0.0, 0.0])  # Unit vector
-    
-    # Output configuration
+    ant_radius: float = 10.0           # metres, for auto-generated circular array
+
+    # F-engine
+    n_channels: int = 256              # FFT size — must be a power of 2
+    window: str = "hanning"            # rectangular / hanning / hamming / blackman
+    integration_time: float = 1.0      # seconds per output visibility
+
+    # Signal
+    sample_rate: float = 1024.0        # Hz
+    center_freq: float = 1.42e9        # Hz  (HI line default)
+
+    # Input
+    mode: str = "simulate"             # "simulate" or "file"
+    input_file: str = ""               # path to .npy file  (mode=file only)
+    duration: float = 10.0             # seconds  (mode=simulate only)
+    snr: float = 20.0                  # dB       (mode=simulate only)
+
+    # Output
     output_dir: str = "/workspace/outputs"
-    save_channelised: bool = False  # Save intermediate F-engine output
-    save_visibilities: bool = True
-    output_format: Literal["npy", "hdf5", "fits"] = "npy"
-    
-    # Runtime parameters
-    chunk_size: int = 4096  # Samples per processing chunk
-    max_integrations: Optional[int] = None  # None = run until data exhausted
-    
-    # Production features
-    enable_monitoring: bool = False  # Real-time performance monitoring
-    enable_logging: bool = True  # Structured logging
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
-    log_file: Optional[str] = None  # None = stdout only
-    enable_quality_checks: bool = False  # Data quality validation
-    enable_rfi_detection: bool = False  # Radio Frequency Interference detection
-    
-    # Calibration (production mode)
-    calibration_file: Optional[str] = None  # Path to calibration data
-    apply_bandpass_cal: bool = False
-    apply_phase_cal: bool = False
-    apply_delay_cal: bool = False
-    
-    def __post_init__(self):
-        """Validate and normalize configuration."""
-        # Keep legacy `mode` and `data_source` in sync
-        try:
-            # If constructor provided `mode`, prefer it for data_source
-            if getattr(self, 'mode', None):
-                self.data_source = self.mode  # type: ignore
-        except Exception:
-            pass
+    output_format: str = "npy"         # npy / hdf5 / fits
 
-        # Ensure the `mode` attribute reflects `data_source`
-        self.mode = self.data_source  # type: ignore
-
+    def validate(self):
         if self.n_ants < 2:
             raise ValueError("n_ants must be >= 2")
-        
         if self.n_channels < 2 or (self.n_channels & (self.n_channels - 1)) != 0:
-            raise ValueError("n_channels must be a power of 2")
-        
-        if self.integration_time <= 0:
-            raise ValueError("integration_time must be positive")
-        
-        # Validate data source requirements
-        if self.data_source == "file" and self.input_file is None:
-            raise ValueError("input_file must be specified when data_source='file'")
-        
-        if self.data_source == "network_stream" and not self.stream_address:
-            raise ValueError("stream_address must be specified for network streaming")
-        
-        # Production mode validations
-        if self.operation_mode == "production":
-            if self.data_source == "simulated":
-                raise ValueError("Production mode cannot use simulated data source")
-            
-            # Enable production features by default
-            if self.enable_monitoring is False:
-                self.enable_monitoring = True
-            if self.enable_quality_checks is False:
-                self.enable_quality_checks = True
-    
-    def is_development_mode(self) -> bool:
-        """Check if running in development mode."""
-        return self.operation_mode == "development"
-    
-    def is_production_mode(self) -> bool:
-        """Check if running in production mode."""
-        return self.operation_mode == "production"
-    
-    @classmethod
-    def from_yaml(cls, path: str | Path) -> "CorrelatorConfig":
-        """Load configuration from YAML file."""
-        with open(path, "r") as f:
-            data = yaml.safe_load(f) or {}
-        
-        # Convert ant_positions from list to ndarray if present
-        if "ant_positions" in data and data["ant_positions"] is not None:
-            data["ant_positions"] = np.array(data["ant_positions"])
-        
-        return cls(**data)
-    
+            raise ValueError("n_channels must be a power of 2 (e.g. 64, 128, 256, 512, 1024)")
+        if self.window not in ("rectangular", "hanning", "hamming", "blackman"):
+            raise ValueError("window must be: rectangular, hanning, hamming, or blackman")
+        if self.mode not in ("simulate", "file"):
+            raise ValueError("mode must be 'simulate' or 'file'")
+        if self.mode == "file" and not self.input_file:
+            raise ValueError("input_file must be set when mode='file'")
+        if self.output_format not in ("npy", "hdf5", "fits"):
+            raise ValueError("output_format must be: npy, hdf5, or fits")
+
+    def ant_positions(self) -> np.ndarray:
+        """Return (n_ants, 2) array of antenna positions on a uniform circle."""
+        angles = np.linspace(0, 2 * np.pi, self.n_ants, endpoint=False)
+        return np.stack([self.ant_radius * np.cos(angles),
+                         self.ant_radius * np.sin(angles)], axis=1)
+
     def to_yaml(self, path: str | Path):
-        """Save configuration to YAML file."""
-        data = asdict(self)
-        
-        # Convert ndarray to list for YAML serialization
-        if self.ant_positions is not None:
-            data["ant_positions"] = self.ant_positions.tolist()
-        
+        data = {k: v for k, v in self.__dict__.items()}
         with open(path, "w") as f:
             yaml.dump(data, f, default_flow_style=False)
-    
-    def get_ant_positions(self) -> np.ndarray:
-        """Get or generate antenna positions."""
-        if self.ant_positions is not None:
-            return self.ant_positions
-        
-        # Generate uniform circle
-        angles = np.linspace(0, 2 * np.pi, self.n_ants, endpoint=False)
-        x = self.ant_radius * np.cos(angles)
-        y = self.ant_radius * np.sin(angles)
-        return np.stack([x, y], axis=1)
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> "Config":
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        valid = {k for k in cls.__dataclass_fields__}
+        return cls(**{k: v for k, v in data.items() if k in valid})

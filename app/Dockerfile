@@ -24,16 +24,9 @@ WORKDIR /app
 # Copy installed packages from builder stage
 COPY --from=builder /install /usr/local
 
-# Create correlator command
-RUN sh -c 'echo "#!/bin/bash" > /usr/local/bin/correlator && echo "exec python -m correlator \"\$@\"" >> /usr/local/bin/correlator && chmod +x /usr/local/bin/correlator' # v2
-ENV CORRELATOR_BUILD=2
-
-# Create output directory (will be mounted as volume)
-RUN mkdir -p /app/outputs
-
 # Set environment variables
 ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
 ENV PYTHONUNBUFFERED=1
 
-# Default command: show help
-CMD ["python", "-m", "correlator", "--help"]
+# Default: start the interactive shell
+CMD ["python", "-m", "correlator"]

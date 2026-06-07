@@ -1,459 +1,192 @@
-# Telescope Correlator - FX Architecture
+# Telescope Correlator — FX Architecture
 
-A production-ready software correlator for radio telescope arrays implementing the FX (Fourier Transform-Cross Multiply) architecture. This correlator processes time-domain antenna signals to produce calibrated visibility measurements used in radio astronomy imaging.
+A software FX correlator for radio telescope arrays.
 
-## Table of Contents
+- **F-engine** — windowed FFT converts time-domain antenna signals into frequency channels
+- **X-engine** — cross-multiplies every antenna pair to produce visibility measurements
+- **Delay compensation** — geometric fringe stopping so all antennas phase-align to the same sky direction
 
-- [Overview](#overview)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Quick Start](#quick-start)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Development Mode](#development-mode)
-  - [Production Mode](#production-mode)
-  - [File-Based Processing](#file-based-processing)
-- [Configuration](#configuration)
-- [Output Data](#output-data)
-- [Testing](#testing)
-- [Examples](#examples)
-- [Troubleshooting](#troubleshooting)
-- [System Requirements](#system-requirements)
-
-## Overview
-
-The Telescope Correlator is a Python-based implementation of an FX correlator designed for radio telescope arrays. It converts time-domain signals from multiple antennas into frequency-domain visibilities, which are the fundamental measurements in radio interferometry.
-
-### What is an FX Correlator?
-
-An FX correlator processes antenna signals in two stages:
-- **F-Engine (Fourier Transform)**: Converts time-domain signals into frequency channels using windowed FFT
-- **X-Engine (Cross-Multiply)**: Computes cross-correlations between antenna pairs to produce visibilities
-
-This architecture is efficient for wide-field imaging and is used in many modern radio telescopes.
-
-## Features
-
-- Full FX pipeline: F-engine channelization and X-engine cross-correlation with geometric delay compensation
-- Six configurable window functions (Hanning, Hamming, Blackman, Rectangular) and polyphase filterbank mode
-- Multiple output formats: NumPy (.npy), HDF5 (.h5), and FITS (.fits)
-- Docker-based deployment with development (simulation) and production (real data) operation modes
-
-## Tech Stack
-
-`Python · NumPy · SciPy · h5py · Astropy · PyYAML · Docker`
+Output files land in `workspace/outputs/` on the host.
 
 ---
 
-## Quick Start
-
-### Using Docker (Recommended)
+## Quick start
 
 ```bash
-git clone https://github.com/yourusername/telescope-correlator.git
-cd telescope-correlator
+# 1. Build the Docker image  (once)
+./correlator build          # Linux
+correlator.bat build        # Windows
 
-# Build the Docker image
-correlator.bat build     # Windows
-./correlator build       # Linux/Mac
-
-# Start interactive development mode
-correlator.bat dev       # Windows
-./correlator dev         # Linux/Mac
+# 2. Start the interactive shell
+./correlator                # Linux
+correlator.bat              # Windows
 ```
 
-### Quick Test Run
+You will see:
 
-```bash
-# Run a quick simulation with 4 antennas
-correlator.bat dev run --n-ants 4 --sim-duration 5.0
+```
+Telescope Correlator  —  FX Architecture
+=========================================
+  run             Run the correlator with current settings
+  set KEY VALUE   Change a setting
+  config          Show all settings
+  list            List output files
+  plot [FILE]     Plot visibility amplitude and phase
+  help [CMD]      Show help
+  quit            Exit
 
-# Check the output
-ls workspace/outputs/
+correlator>
 ```
 
-## Installation
+Type `run` to run immediately with defaults (4 antennas, 10-second simulation).
 
-### Docker Installation (Recommended)
+---
 
-1. **Install Docker Desktop**
-   - Windows/Mac: [Docker Desktop](https://www.docker.com/products/docker-desktop)
-   - Linux: [Docker Engine](https://docs.docker.com/engine/install/)
+## Shell commands
 
-2. **Build the Correlator Image**
-   ```bash
-   correlator.bat build   # Windows
-   ./correlator build     # Linux/Mac
-   ```
+| Command | What it does |
+|---------|--------------|
+| `run` | Run the FX correlator with current settings |
+| `set KEY VALUE` | Change any setting (see table below) |
+| `config` | Show all settings and their current values |
+| `list` | List files in `workspace/outputs/` |
+| `plot` | Save an amplitude + phase image of a visibility file |
+| `help` | Full help; `help run`, `help set`, etc. for per-command detail |
+| `quit` | Exit |
 
-3. **Verify Installation**
-   ```bash
-   correlator.bat dev --help
-   ```
+---
 
-### Native Python Installation
+## Settings
 
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
+Use `set KEY VALUE` to change any of these:
 
-pip install -r requirements.txt
-pip install -e app/src/
+| Key | Default | Description |
+|-----|---------|-------------|
+| `n_ants` | 4 | Number of antennas (≥ 2) |
+| `ant_radius` | 10.0 | Antenna array radius (metres) |
+| `n_channels` | 256 | FFT channels — must be a power of 2 |
+| `window` | hanning | Window function: `rectangular` / `hanning` / `hamming` / `blackman` |
+| `integration_time` | 1.0 | Seconds of data averaged per output visibility |
+| `sample_rate` | 1024.0 | Sample rate (Hz) |
+| `center_freq` | 1.42e9 | Centre frequency (Hz) — default is the HI line |
+| `mode` | simulate | `simulate` (synthetic data) or `file` (load a .npy file) |
+| `input_file` | | Path to input file when `mode=file` |
+| `duration` | 10.0 | Simulation length in seconds (mode=simulate) |
+| `snr` | 20.0 | Signal-to-noise ratio in dB (mode=simulate) |
+| `output_format` | npy | `npy` / `hdf5` / `fits` |
+| `output_dir` | /workspace/outputs | Where to write output files |
 
-python -m correlator dev --help
+### Example session
+
+```
+correlator> set n_ants 8
+correlator> set duration 30.0
+correlator> set output_format hdf5
+correlator> run
+correlator> list
+correlator> plot
 ```
 
-**Requirements:**
-- Python 3.11+
-- NumPy >= 1.25
-- SciPy >= 1.11
-- PyYAML >= 6.0
-- h5py >= 3.10 (for HDF5 output)
-- astropy >= 6.0 (for FITS output)
+---
 
-## Usage
+## Output files
 
-The correlator has two primary operation modes:
-
-### Development Mode
-
-Development mode is for simulations, testing, and learning. It generates synthetic antenna signals and is perfect for algorithm development.
-
-#### Interactive CLI
-
-```bash
-correlator.bat dev
-```
-
-#### Command-Line Execution
-
-```bash
-# Basic simulation with default parameters
-correlator.bat dev run
-
-# Custom configuration
-correlator.bat dev run --n-ants 8 --n-channels 512 --integration-time 2.0
-
-# Longer simulation
-correlator.bat dev run --sim-duration 30.0 --max-integrations 10
-```
-
-#### Common Development Parameters
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `--n-ants` | Number of antennas | 4 |
-| `--n-channels` | FFT size (power of 2) | 256 |
-| `--sample-rate` | Sample rate (Hz) | 1024.0 |
-| `--integration-time` | Integration period (sec) | 1.0 |
-| `--sim-duration` | Simulation length (sec) | 10.0 |
-| `--sim-snr` | Signal SNR (dB) | 20.0 |
-| `--window-type` | Window function | hanning |
-| `--output-dir` | Output directory | /workspace/outputs |
-
-### Production Mode
-
-Production mode processes real telescope data from files or network streams.
-
-#### Streaming from Network
-
-```bash
-correlator.bat prod stream --source tcp://10.0.0.1:7148
-correlator.bat prod stream --source tcp://antenna-server:7148 --config workspace/configs/prod/default.yaml
-```
-
-#### Processing Recorded Data
-
-```bash
-correlator.bat prod process --input-file workspace/inputs/observation_20260124.npy
-correlator.bat prod process --input-file data/obs.npy --config workspace/configs/prod/array64.yaml
-```
-
-### File-Based Processing
-
-```bash
-correlator.bat dev run --mode file --input-file workspace/inputs/simple_signal.npy
-correlator.bat dev run --config workspace/configs/my_config.yaml
-```
-
-**Data Format Requirements:**
-- NumPy array (.npy file)
-- Shape: `(n_antennas, n_samples)`
-- Dtype: `complex64` or `complex128`
-
-## Configuration
-
-### Example: Development Configuration
-
-```yaml
-operation_mode: development
-data_source: simulated
-n_ants: 8
-ant_radius: 10.0
-sample_rate: 1024.0
-center_freq: 1420000000.0
-n_channels: 256
-window_type: hanning
-quantize_bits: 0
-overlap_factor: 0.0
-integration_time: 1.0
-sim_duration: 20.0
-sim_snr: 20.0
-enable_delays: true
-phase_center: [1.0, 0.0, 0.0]
-output_dir: workspace/outputs
-output_format: npy
-```
-
-### Example: Production Configuration
-
-```yaml
-operation_mode: production
-data_source: network_stream
-stream_protocol: tcp
-stream_address: telescope-server:7148
-n_ants: 64
-ant_radius: 100.0
-sample_rate: 2048000.0
-center_freq: 1420405751.77
-n_channels: 4096
-window_type: hanning
-quantize_bits: 8
-overlap_factor: 0.25
-integration_time: 1.0
-output_dir: workspace/outputs/prod
-output_format: hdf5
-enable_monitoring: true
-log_level: INFO
-```
-
-### Configuration Parameters
-
-#### Array Configuration
-- `n_ants`: Number of antennas (≥ 2)
-- `ant_positions`: Explicit antenna positions or null for circular array
-- `ant_radius`: Radius for auto-generated circular array (meters)
-
-#### F-Engine Parameters
-- `n_channels`: Number of frequency channels (must be power of 2)
-- `window_type`: `rectangular`, `hanning`, `hamming`, or `blackman`
-- `quantize_bits`: Bit depth (0 = no quantization, 8/16 typical)
-- `overlap_factor`: FFT window overlap (0.0 to 0.5)
-
-#### X-Engine Parameters
-- `integration_time`: Time integration period (seconds)
-
-#### Output Parameters
-- `output_format`: `npy`, `hdf5`, or `fits`
-- `save_channelised`: Save intermediate F-engine output
-- `max_integrations`: Maximum integrations (null = unlimited)
-
-## Output Data
-
-### File Naming Convention
+All output appears in `workspace/outputs/` in the project folder.
 
 ```
 workspace/outputs/
-├── visibility_0001.npy
+├── visibility_0001.npy      ← one file per integration period
 ├── visibility_0002.npy
-├── config.yaml
-└── channelised.npy   (optional)
+├── config.yaml              ← settings used for this run
+└── visibility_0001_plot.png ← generated by the 'plot' command
 ```
 
-### Visibility Data Format
+**Visibility array shape:** `(n_baselines, n_channels)` — `complex128`
 
-**Shape:** `(n_baselines, n_channels)`
+Baselines are ordered: autocorrelations first `(0,0), (1,1), …` then cross-correlations `(0,1), (0,2), …`
 
 | Antennas | Baselines |
 |----------|-----------|
-| 4        | 10        |
-| 8        | 36        |
-| 16       | 136       |
-| 64       | 2080      |
+| 2 | 3 |
+| 4 | 10 |
+| 8 | 36 |
+| 16 | 136 |
 
-**Baseline Ordering:** Autocorrelations first `(0,0), (1,1)...`, then cross-correlations `(0,1), (0,2)...`
-
-**Data Type:** `complex128`
-
-### Reading Output Data
+### Reading output files in Python
 
 ```python
 import numpy as np
 
-vis = np.load('workspace/outputs/visibility_0001.npy')
-print(f"Shape: {vis.shape}")  # (n_baselines, n_channels)
+vis = np.load("workspace/outputs/visibility_0001.npy")
+print(vis.shape)   # (n_baselines, n_channels)
 
+# Separate autocorrelations from cross-correlations
 n_ants = 4
-autocorr  = vis[:n_ants, :]   # Antenna powers
-cross_corr = vis[n_ants:, :]  # Cross-correlations
+auto  = vis[:n_ants, :]   # power spectra
+cross = vis[n_ants:, :]   # interferometric visibilities
 ```
-
-### HDF5 Format
-
-```python
-import h5py
-
-with h5py.File('workspace/outputs/visibility_0001.h5', 'r') as f:
-    vis = f['visibilities'][:]
-    print(dict(f.attrs))
-```
-
-### FITS Format
-
-```python
-from astropy.io import fits
-
-with fits.open('workspace/outputs/visibility_0001.fits') as hdul:
-    vis = hdul['REAL'].data + 1j * hdul['IMAG'].data
-```
-
-## Testing
-
-```bash
-# Run all tests (Docker)
-correlator.bat test
-
-# Native Python
-pytest tests_harness/ -v
-
-# Specific test suites
-pytest tests_harness/unit/test_fengine.py -v
-pytest tests_harness/unit/test_delay.py -v
-python tests_harness/validate_accuracy.py all
-```
-
-## Examples
-
-### Basic Simulation
-
-```bash
-correlator.bat dev run --n-ants 4 --sim-duration 10.0 --output-dir workspace/outputs/ex1
-```
-
-### Large Array Simulation
-
-```bash
-correlator.bat dev run \
-  --n-ants 64 \
-  --n-channels 4096 \
-  --integration-time 2.0 \
-  --sim-duration 60.0
-```
-
-### Custom Configuration
-
-```yaml
-# my_experiment.yaml
-operation_mode: development
-data_source: simulated
-n_ants: 16
-n_channels: 1024
-integration_time: 5.0
-sim_duration: 120.0
-window_type: blackman
-overlap_factor: 0.25
-output_format: hdf5
-```
-
-```bash
-correlator.bat dev run --config my_experiment.yaml
-```
-
-### HI Line Observation Simulation
-
-```bash
-correlator.bat dev run \
-  --n-ants 8 \
-  --center-freq 1420000000 \
-  --sample-rate 2048000 \
-  --n-channels 2048 \
-  --integration-time 10.0 \
-  --sim-duration 600.0 \
-  --output-format hdf5
-```
-
-## Troubleshooting
-
-### Docker container won't start
-
-```bash
-docker ps -a
-docker rm telescope-correlator
-correlator.bat build
-```
-
-### "n_channels must be a power of 2"
-
-Valid values: 64, 128, 256, 512, 1024, 2048, 4096.
-
-### Out of memory
-
-```bash
---n-channels 256
---max-integrations 10
-```
-
-### File not found errors
-
-Inside Docker, use the mounted workspace path:
-
-```bash
---input-file /workspace/inputs/data.npy
---output-dir /workspace/outputs/
-```
-
-### Getting help
-
-```bash
-correlator.bat dev run --help
-correlator.bat prod --help
-```
-
-## System Requirements
-
-### Minimum
-- CPU: 2 cores, 2.0 GHz
-- RAM: 4 GB
-- Disk: 5 GB
-
-### Recommended for Production
-- CPU: 8+ cores, 3.0+ GHz
-- RAM: 16+ GB
-- Disk: 100+ GB SSD
-
-### Performance Guidelines
-
-| Array Size | Channels | RAM Usage | Speed |
-|------------|----------|-----------|-------|
-| 4 ants     | 256      | ~500 MB   | Real-time |
-| 8 ants     | 512      | ~1 GB     | Real-time |
-| 16 ants    | 1024     | ~2 GB     | Near real-time |
-| 64 ants    | 4096     | ~8 GB     | Batch preferred |
-
-## Architecture Overview
-
-For detailed information about signal processing algorithms and implementation, see [ARCHITECTURE.md](ARCHITECTURE.md).
-
-## Contributing
-
-Contributions are welcome. Ensure all tests pass (`correlator.bat test`), code follows existing style, and new features include tests.
-
-## License
-
-This project is part of academic research. Please cite appropriately if used in publications.
-
-## Citation
-
-```
-Telescope Correlator - FX Architecture
-[Author], [Institution], 2026
-```
-
-## Acknowledgments
-
-Developed as part of research in radio astronomy signal processing and software-defined radio telescopes.
 
 ---
 
-**Version:** 1.0.0 | **Last Updated:** January 2026 | [ARCHITECTURE.md](ARCHITECTURE.md)
+## Running with docker compose
+
+```bash
+docker compose run --rm correlator   # interactive shell
+docker compose run --rm test         # run test suite
+```
+
+---
+
+## Running tests
+
+```bash
+./correlator test       # Linux
+correlator.bat test     # Windows
+```
+
+---
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) (Docker Desktop on Windows, Docker Engine on Linux)
+
+### Native Python (without Docker)
+
+```bash
+python -m venv venv
+source venv/bin/activate        # Linux
+venv\Scripts\activate           # Windows
+
+pip install -r requirements.txt
+pip install -e app/src/
+python -m correlator
+```
+
+Requires Python 3.11+.
+
+---
+
+## System requirements
+
+| | Minimum | Recommended |
+|-|---------|-------------|
+| CPU | 2 cores | 8+ cores |
+| RAM | 4 GB | 16+ GB |
+| Disk | 5 GB | 50+ GB |
+
+Typical RAM usage: ~500 MB for 4 antennas / 256 channels, scaling roughly as `n_baselines × n_channels × 8 bytes`.
+
+---
+
+## Architecture
+
+The FX pipeline:
+
+```
+Antennas → [F-engine: windowed FFT] → frequency channels
+         → [Delay engine: phase rotation] → fringe-stopped channels
+         → [X-engine: cross-multiply + integrate] → visibilities
+         → workspace/outputs/visibility_NNNN.*
+```
+
+For implementation details see [ARCHITECTURE.md](ARCHITECTURE.md).

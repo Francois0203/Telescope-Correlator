@@ -1,5 +1,4 @@
 services:
-  # Interactive CLI service
   correlator:
     build:
       context: .
@@ -7,22 +6,18 @@ services:
     image: telescope-correlator:latest
     container_name: telescope-correlator
     volumes:
-      - ./dev_workspace/outputs:/app/outputs
-    working_dir: /app
+      - ./workspace:/workspace
     stdin_open: true
     tty: true
-    command: ["python", "-m", "correlator", "--interactive"]
+    command: ["python", "-m", "correlator"]
 
-  # Test service
   test:
-    build:
-      context: .
-      dockerfile: app/Dockerfile
     image: telescope-correlator:latest
+    depends_on:
+      - correlator
     container_name: telescope-correlator-test
     volumes:
       - .:/workspace
-      - ./dev_workspace/outputs:/app/outputs
     working_dir: /workspace
     command: ["pytest", "tests_harness/", "-v", "--tb=short"]
     environment:
