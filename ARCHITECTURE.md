@@ -29,11 +29,11 @@ The correlator converts time-domain voltage signals from multiple antennas into 
 
 ### Key Design Principles
 
-1. **Modular Architecture**: Each processing stage is independent and testable
-2. **Configurable Pipeline**: All parameters can be adjusted via configuration files
-3. **Dual-Mode Operation**: Supports both simulation (development) and real data (production)
-4. **Scientific Accuracy**: Validated against analytical solutions and benchmarks
-5. **Production-Ready**: Robust error handling, logging, and monitoring capabilities
+1. **Modular Architecture**: Each processing stage (frontend, F-engine, delay, X-engine) is an independent, testable module
+2. **Configurable Pipeline**: All parameters are exposed as settings on a single `Config` object, adjustable from the interactive shell
+3. **Dual Input Modes**: Supports both `simulate` (synthetic signals) and `file` (load a recorded `.npy` array)
+4. **Scientific Accuracy**: Algorithms validated against analytical expectations in the test suite
+5. **Reproducible**: Each run writes the exact `Config` used to `config.yaml` alongside its outputs
 
 ## Architecture
 
@@ -43,11 +43,12 @@ The correlator converts time-domain voltage signals from multiple antennas into 
 ┌─────────────────────────────────────────────────────────────────┐
 │                        DATA SOURCES                              │
 ├─────────────────────────────────────────────────────────────────┤
-│  Simulated Stream  │  File (Batch)  │  Network Stream (TCP/UDP) │
-└───────────┬─────────────────┬─────────────────┬─────────────────┘
-            │                 │                 │
-            └─────────────────┼─────────────────┘
-                              │
+│      Simulated Stream      │      File (Batch .npy)              │
+│  (mode=simulate)           │      (mode=file)                    │
+└───────────┬────────────────────────────┬────────────────────────┘
+            │                            │
+            └──────────────┬─────────────┘
+                           │
                     ┌─────────▼──────────┐
                     │     FRONTEND       │
                     │  (Data Ingestion)  │
@@ -250,7 +251,8 @@ Benefits of overlap:
 - Smoother frequency response
 - Reduced scalloping loss
 - Improved time resolution
-- Standard: 25% (overlap_factor=0.25)
+
+> **Note:** Overlap is implemented in the `FEngine` class (`overlap_factor` constructor argument) but is **not currently exposed** through `Config` or the shell. The pipeline instantiates `FEngine` with the default `overlap_factor=0.0` (no overlap).
 
 #### Quantization
 
@@ -268,6 +270,8 @@ Quantization process:
 4. Reconstruct complex values
 
 **Impact:** Adds quantization noise, models real systems
+
+> **Note:** Quantization is implemented in the `FEngine` class (`quantize_bits` constructor argument and the `quantize_signal` helper) but is **not currently exposed** through `Config` or the shell. The pipeline runs with the default `quantize_bits=0` (no quantization).
 
 #### Channel Frequencies
 
@@ -460,89 +464,80 @@ visibilities[:, 128] # All baselines at channel 128
 
 ### Configuration Structure
 
+**File:** [`app/src/correlator/config.py`](app/src/correlator/config.py)
+
 ```python
 @dataclass
-class CorrelatorConfig:
-    # Operation mode
-    operation_mode: Literal["development", "production"]
-    
+class Config:
     # Array
-    n_ants: int
-    ant_positions: Optional[np.ndarray]
-    ant_radius: float
-    
-    # Signal
-    sample_rate: float
-    center_freq: float
-    
+    n_ants: int = 4
+    ant_radius: float = 10.0           # metres, for auto-generated circular array
+
     # F-engine
-    n_channels: int
-    window_type: WindowType
-    quantize_bits: int
-    overlap_factor: float
-    
-    # X-engine
-    integration_time: float
-    
-    # Data source
-    data_source: DataSource
-    input_file: Optional[str]
-    stream_address: str
-    
-    # Simulation
-    sim_duration: float
-    sim_snr: float
-    sim_source_angles: list[float]
-    
-    # Delay compensation
-    enable_delays: bool
-    phase_center: list[float]
-    
+    n_channels: int = 256              # FFT size — must be a power of 2
+    window: str = "hanning"            # rectangular / hanning / hamming / blackman
+    integration_time: float = 1.0      # seconds per output visibility
+
+    # Signal
+    sample_rate: float = 1024.0        # Hz
+    center_freq: float = 1.42e9        # Hz  (HI line default)
+
+    # Input
+    mode: str = "simulate"             # "simulate" or "file"
+    input_file: str = ""               # path to .npy file  (mode=file only)
+    duration: float = 10.0             # seconds  (mode=simulate only)
+    snr: float = 20.0                  # dB       (mode=simulate only)
+
     # Output
-    output_dir: str
-    output_format: Literal["npy", "hdf5", "fits"]
-    save_channelised: bool
-    
-    # Runtime
-    chunk_size: int
-    max_integrations: Optional[int]
+    output_dir: str = "/workspace/outputs"
+    output_format: str = "npy"         # npy / hdf5 / fits
 ```
+
+The `Config` class also provides:
+
+- `validate()` — raises `ValueError` on invalid settings
+- `ant_positions()` — returns an `(n_ants, 2)` array of antenna positions on a uniform circle of radius `ant_radius`
+- `to_yaml(path)` / `from_yaml(path)` — save and load settings as YAML
+
+> **Note:** Antenna positions are always auto-generated as a uniform circle from `n_ants` and `ant_radius`; explicit per-antenna positions are not currently a configurable setting. Source angles for simulation are fixed in the pipeline (`[0.0, π/6]`), the delay phase centre is fixed to `[1.0, 0.0, 0.0]`, and quantization/overlap are not exposed (see the F-engine notes above).
 
 ## Configuration System
 
-### Configuration Hierarchy
+### How settings are set
 
-1. **Default values** (in `CorrelatorConfig` class)
-2. **YAML config file** (if provided)
-3. **Command-line arguments** (highest priority)
+Settings start at the dataclass defaults and are changed interactively in the shell with `set KEY VALUE`. There is **no command-line argument parsing** — the application is a single interactive shell (`python -m correlator`).
+
+Every run writes the `Config` that was used to `config.yaml` in the output directory, so any run can be reproduced.
 
 ### Configuration Loading
 
 ```python
-# Load from YAML
-config = CorrelatorConfig.from_yaml("config.yaml")
+# Defaults
+config = Config()
 
 # Programmatic configuration
-config = CorrelatorConfig(
+config = Config(
     n_ants=8,
     n_channels=512,
     integration_time=2.0,
 )
 
-# Save configuration
+# Save / load YAML  (unknown keys are ignored on load)
 config.to_yaml("saved_config.yaml")
+config = Config.from_yaml("saved_config.yaml")
 ```
 
 ### Validation
 
-Configuration validation ensures:
+`Config.validate()` is called at the start of every pipeline run and ensures:
 - `n_ants >= 2`
-- `n_channels` is power of 2
-- `integration_time > 0`
-- File paths exist for file-based sources
-- Production mode doesn't use simulated data
+- `n_channels` is a power of 2 (and `>= 2`)
+- `window` is one of `rectangular` / `hanning` / `hamming` / `blackman`
+- `mode` is `simulate` or `file`
+- `input_file` is set when `mode == "file"`
+- `output_format` is one of `npy` / `hdf5` / `fits`
 
-Invalid configurations raise `ValueError` with descriptive messages.
+The shell additionally enforces numeric bounds on each setting as it is entered (e.g. `n_ants` 2–64, `n_channels` 32–4096). Invalid configurations raise `ValueError` with descriptive messages.
 
 ## Mathematical Foundations
 
@@ -653,12 +648,12 @@ Visibility size = 16 · 2080 · 4096 = ~136 MB per integration
    - Typical chunk size: 4096-8192 samples
 
 2. **NumPy Vectorization**
-   - Use NumPy array operations (C-speed)
-   - Avoid Python loops over antennas/channels
+   - Operations over the channel axis are vectorised (C-speed)
+   - *Current state:* the F-engine loops over antennas/spectra and the X-engine loops over baselines in Python; these per-element loops are an obvious target for further vectorisation
 
 3. **FFT Optimization**
    - Use power-of-2 channel counts
-   - NumPy uses FFTW (highly optimized)
+   - `numpy.fft` uses the bundled pocketfft implementation
 
 4. **Baseline Triangular Loop**
    - Only compute i ≤ j (use conjugate symmetry)
@@ -669,23 +664,11 @@ Visibility size = 16 · 2080 · 4096 = ~136 MB per integration
    - X-engine: Matrix multiplication on GPU
    - Potential speedup: 10-100×
 
-### Performance Benchmarks
+### Performance
 
-**Development Machine:**
-- CPU: Intel i7-12700K (8P+4E cores)
-- RAM: 32 GB DDR4
-- Python: 3.11, NumPy 1.26
+Runtime is dominated by the X-engine for large arrays (`O(N² · T)`) and by the F-engine FFTs for small ones (`O(N · T · log C)`). Because the X-engine currently loops over baselines in Python, throughput is well below what a fully vectorised or GPU implementation would achieve.
 
-**Results:**
-
-| Config | Processing Time | Speed |
-|--------|----------------|-------|
-| 4 ants, 256 ch, 10s data | 0.8 s | 12× realtime |
-| 8 ants, 512 ch, 10s data | 2.5 s | 4× realtime |
-| 16 ants, 1024 ch, 10s data | 12 s | 0.8× realtime |
-| 64 ants, 4096 ch, 10s data | 180 s | 0.05× realtime |
-
-**Conclusion:** Real-time processing feasible up to ~16 antennas on single machine.
+> No benchmark numbers are published here. The previous version of this document listed measured timings on a specific machine; those figures predated the "Simplify App" rewrite and are no longer representative, so they have been removed. Run the pipeline on your target hardware to obtain current numbers.
 
 ## Implementation Details
 
@@ -693,50 +676,54 @@ Visibility size = 16 · 2080 · 4096 = ~136 MB per integration
 
 ```
 app/src/correlator/
-├── __init__.py           # Package exports
-├── __main__.py           # CLI entry point
-├── config.py             # Configuration management
-├── cli/                  # Command-line interface
-│   ├── commands.py       # Argument parsing
-│   ├── dev.py            # Development mode CLI
-│   ├── prod.py           # Production mode CLI
-│   ├── interactive.py    # Interactive shell
-│   └── runner.py         # Pipeline execution
-├── core/                 # Core processing modules
-│   ├── frontend.py       # Data ingestion
-│   ├── fengine.py        # Channelizer
-│   ├── delay.py          # Delay compensation
-│   └── xengine.py        # Correlator
-└── streaming/            # Future: network streaming
+├── __init__.py           # Package exports (Config, FEngine, XEngine, DelayEngine, ...)
+├── __main__.py           # Entry point — launches the interactive shell
+├── config.py             # Config dataclass (settings, validation, YAML I/O)
+├── shell.py              # Interactive shell (cmd.Cmd): run/set/config/list/plot/...
+├── pipeline.py           # FX pipeline orchestration (pipeline.run)
+└── core/                 # Core processing modules
+    ├── __init__.py
+    ├── frontend.py       # Data ingestion (SimulatedStream, BatchFileSource)
+    ├── fengine.py        # Channeliser (windowed FFT)
+    ├── delay.py          # Geometric delay compensation
+    └── xengine.py        # Correlator (cross-multiply + integrate)
 ```
+
+> **Note:** Network streaming is described as a future enhancement above; there is currently no `streaming/` package or CLI argument layer in the codebase.
 
 ### Key Design Patterns
 
 **1. Strategy Pattern (Data Sources)**
 ```python
-class DataSource(ABC):
+class DataSource:
     def stream(self, chunk_size) -> Iterator[np.ndarray]:
-        pass
+        raise NotImplementedError
 
 class SimulatedStream(DataSource): ...
 class BatchFileSource(DataSource): ...
 ```
 
-**2. Pipeline Pattern (Processing)**
+**2. Pipeline Pattern (Processing)** — see [`pipeline.py`](app/src/correlator/pipeline.py)
 ```python
-data = frontend.stream(chunk_size)
-for chunk in data:
-    channelized = fengine.process(chunk)
-    corrected = delay_engine.apply(channelized)
-    visibilities = xengine.correlate(corrected)
+for chunk in source:                                     # (n_ants, chunk_size)
+    channelised = fengine.process_chunk(chunk)           # (n_ants, n_spectra, n_channels)
+    channelised = delay_engine.apply_delays(channelised, freq_channels)
+    for spec_idx in range(channelised.shape[1]):
+        vis = xengine.correlate_spectrum(channelised[:, spec_idx, :])
+        xengine.accumulate(vis)
+        if xengine.is_ready():
+            integrated = xengine.get_integrated()        # (n_baselines, n_channels)
+            # ... save to disk
 ```
 
-**3. Configuration Object Pattern**
+**3. Explicit-Argument Construction**
+
+Engines are constructed with explicit keyword arguments (not the whole `Config` object), which keeps each module decoupled from the configuration schema:
 ```python
-config = CorrelatorConfig.from_yaml("config.yaml")
-frontend = Frontend(config)
-fengine = FEngine(config)
-xengine = XEngine(config)
+config  = Config.from_yaml("config.yaml")
+fengine = FEngine(n_channels=config.n_channels, window_type=config.window)
+xengine = XEngine(n_ants=config.n_ants, n_channels=config.n_channels,
+                  integration_time=config.integration_time, sample_rate=config.sample_rate)
 ```
 
 ### Error Handling
@@ -770,88 +757,78 @@ except ImportError:
 
 ### Testing Strategy
 
-**Unit Tests:** Test individual components
-```python
-def test_fengine_fft_accuracy():
-    fengine = FEngine(n_channels=256)
-    pure_tone = generate_pure_tone(freq=10)
-    spectrum = fengine.process_chunk(pure_tone)
-    assert_peak_at_expected_frequency(spectrum, freq=10)
+Tests live in `tests_harness/` and run with `pytest tests_harness/ -v`, or through the launcher (`./correlator test` on Linux, `correlator.bat test` on Windows), or via `docker compose run --rm test`. The suite is organised into three layers:
+
+```
+tests_harness/
+├── unit/          # test_fengine, test_xengine, test_delay, test_frontend, test_accuracy
+├── integration/   # test_fx_pipeline, test_astronomical_accuracy
+└── generators/    # shared synthetic-signal helpers
 ```
 
-**Integration Tests:** Test full pipeline
+**Unit Tests** — exercise individual components in isolation: window functions and FFT output shape/Parseval (`test_fengine`), baseline count/ordering and autocorrelation reality/Hermitian symmetry (`test_xengine`), geometric delays for zenith/horizon sources (`test_delay`), and the simulated/batch data sources (`test_frontend`).
+
+**Integration Tests** — run the full FX pipeline end-to-end:
 ```python
 def test_end_to_end_pipeline():
-    config = CorrelatorConfig(...)
-    result = run_correlator(config)
+    cfg = Config(n_ants=4, n_channels=256, duration=2.0)
+    result = pipeline.run(cfg)
     assert result == 0
-    assert output_files_exist()
+    # ... assert visibility files were written
 ```
 
-**Validation Tests:** Compare to analytical solutions
-```python
-def test_two_antenna_delay():
-    analytical_delay = calculate_analytical_delay()
-    computed_delay = delay_engine.get_delays()
-    assert np.allclose(computed_delay, analytical_delay)
-```
+**Accuracy / Validation Tests** — compare results to analytical expectations, e.g. that a point source at zenith produces zero geometric delay, and that recovered visibility phases match the injected source geometry (`test_accuracy`, `test_astronomical_accuracy`).
 
-### Logging and Monitoring
+### Console Output
 
-**Console Output:**
+The pipeline reports progress with plain `print` statements (there is no structured-logging or metrics framework). A typical run looks like:
+
 ```
-Initializing FX correlator with 4 antennas, 256 channels
-Creating simulated stream: 10.0s @ 1024.0 Hz
-  Sources: [0.0, 0.5236] rad
-  SNR: 20.0 dB
-Processing...
-  Saved integration 1 -> visibility_0001.npy
-  Saved integration 2 -> visibility_0002.npy
+Antennas        : 4
+Channels        : 256  (window: hanning)
+Sample rate     : 1024.0 Hz
+Centre freq     : 1420.000 MHz
+Integration     : 1.0 s
+Mode            : simulate
+Output          : /workspace/outputs/
+
+  Integration    1  saved
+  Integration    2  saved
+  ...
 Complete: 10 integrations written to /workspace/outputs/
 ```
 
-**Structured Logging (Production):**
-```python
-logger.info("Starting correlation", extra={
-    "n_ants": config.n_ants,
-    "n_channels": config.n_channels,
-    "integration_time": config.integration_time,
-})
-```
-
-**Performance Monitoring:**
-```python
-with Timer("F-engine processing"):
-    channelized = fengine.process_chunk(data)
-# Output: F-engine processing took 0.245 seconds
-```
+Errors raised during a run (e.g. validation failures, missing input files) are caught by the shell and printed as `Error: <message>`, leaving the shell running.
 
 ## Example Data
 
 ### Test Signals
 
-**File:** `workspace/inputs/generate_test_data.py`
+**File:** `workspace/inputs/generate_test_data.py` — run it (`python workspace/inputs/generate_test_data.py`) to write the datasets below as `.npy` files alongside the script. Each is a complex `(n_ants, n_samples)` array suitable for `mode=file`.
 
 **1. Simple Signal** (`simple_signal.npy`)
 - 4 antennas, 4096 samples
 - Single sinusoid at 10 Hz
-- Phase delays simulate point source
+- Linear phase delays across antennas simulate a point source
 - SNR: 20 dB
 
 **2. Dual Source** (`dual_source_signal.npy`)
 - 4 antennas, 4096 samples
-- Two sources at different frequencies
+- Two sources at different frequencies (10 Hz, 15 Hz)
 - Tests source separation
 
 **3. Pulsed Signal** (`pulsed_signal.npy`)
 - 4 antennas, 4096 samples
-- Pulsed carrier (pulsar-like)
+- Pulsed carrier (pulsar-like), 20 Hz carrier, 30% duty cycle
 - Tests time variability
 
-**4. Large Test** (`large_test.npy`)
+**4. Quick Test** (`quick_test.npy`)
+- 4 antennas, 512 samples
+- A small simple-signal dataset for fast tests
+
+**5. Large Test** (`large_test.npy`)
 - 8 antennas, 16384 samples
-- Multiple sources with noise
-- Performance testing
+- Larger simple-signal dataset for performance testing
 
 ### Generating Custom Data
 
@@ -1005,32 +982,53 @@ plt.savefig('radio_image.png')
 
 ### Docker Deployment
 
-**Production Configuration:**
+The image is built from a multi-stage [`app/Dockerfile`](app/Dockerfile) and defaults to launching the interactive shell. (Abbreviated — see the file for the full builder stage.)
+
 ```dockerfile
+FROM python:3.11-slim AS builder
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential
+COPY requirements.txt /app/
+RUN pip install --prefix=/install -r requirements.txt
+COPY app/src/ /app/src/
+RUN pip install --prefix=/install /app/src/
+
 FROM python:3.11-slim
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY app/src/ /app/src/
-RUN pip install /app/src/
-CMD ["python", "-m", "correlator", "prod"]
+COPY --from=builder /install /usr/local
+ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
+ENV PYTHONUNBUFFERED=1
+CMD ["python", "-m", "correlator"]      # interactive shell
 ```
 
-**Docker Compose:**
+**Docker Compose** ([`docker-compose.yml`](docker-compose.yml)) defines a `correlator` service (interactive shell) and a `test` service (pytest):
+
 ```yaml
 services:
   correlator:
-    build: .
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    image: telescope-correlator:latest
     volumes:
       - ./workspace:/workspace
-      - ./logs:/logs
+    stdin_open: true
+    tty: true
+    command: ["python", "-m", "correlator"]
+
+  test:
+    image: telescope-correlator:latest
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    command: ["pytest", "tests_harness/", "-v", "--tb=short"]
     environment:
-      - CORRELATOR_CONFIG=/workspace/configs/prod/default.yaml
-    networks:
-      - telescope_net
+      - PYTHONPATH=/workspace/app/src:/usr/local/lib/python3.11/site-packages
 ```
 
-### Kubernetes Deployment
+### Kubernetes Deployment (illustrative)
+
+> The repository does **not** include Kubernetes manifests. The example below is an illustrative starting point for a long-running deployment, not a tested artifact in this project.
 
 ```yaml
 apiVersion: apps/v1
@@ -1152,12 +1150,11 @@ spec:
 
 ## Conclusion
 
-The Telescope Correlator implements a production-ready FX architecture with comprehensive features for both simulation and real data processing. The modular design enables easy testing, validation, and future enhancements while maintaining scientific accuracy and performance.
+The Telescope Correlator implements a clean, modular FX architecture covering both simulated signals and recorded data files. The modular design enables easy testing, validation, and future enhancements (network streaming, GPU acceleration, calibration) while maintaining scientific accuracy.
 
 For usage instructions, see [README.md](README.md).
 
 ---
 
-**Version:** 1.0.0  
-**Last Updated:** January 2026  
-**Contributors:** [Your Name]
+**Last Updated:** June 2026  
+**Contributors:** Francois
