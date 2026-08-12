@@ -5,9 +5,23 @@ Performs windowed FFT to convert time-domain signals into frequency channels.
 
 Key features:
 - Configurable FFT size (number of channels)
-- Window functions (Hanning, Hamming, Blackman, rectangular)
+- Window functions (Hanning, Hamming, Blackman, rectangular), normalised to
+  unit coherent gain so the flux scale does not depend on the window choice
 - Quantization emulation with configurable bit depths
 - Polyphase filterbank mode (optional)
+
+Amplitude convention
+--------------------
+Windows are scaled by ``n_channels / sum(w)``. A coherent tone of amplitude
+``A`` landing exactly on a bin therefore produces ``|X[k]| = A * n_channels``
+for every window type, and a visibility amplitude of ``(A * n_channels)**2``.
+White noise of variance ``sigma**2`` produces ``<|X[k]|**2> = sigma**2 *
+noise_gain``, which is window dependent because equivalent noise bandwidths
+differ.
+
+The FFT itself is unnormalised (no ``1/N``), so visibility amplitudes scale
+as ``n_channels**2``. That is a deliberate, documented convention rather than
+an oversight; flux calibration absorbs the constant.
 """
 from __future__ import annotations
 
@@ -116,10 +130,30 @@ class FEngine:
         self.window_type = window_type
         self.quantize_bits = quantize_bits
         self.overlap_factor = overlap_factor
-        
-        # Pre-compute window
-        self.window = get_window(window_type, n_channels)
-        
+
+        # Pre-compute the window, normalised to unit coherent gain.
+        #
+        # An unnormalised taper attenuates coherent signals by sum(w)/N — a
+        # factor of about 0.5 for Hanning — so simply changing the window
+        # would rescale every visibility amplitude and, with it, the flux
+        # scale. Scaling by N/sum(w) makes the response to a coherent signal
+        # (a spectral line, a point source on an exact bin) identical for
+        # every window, leaving the window to do only what it is for:
+        # controlling spectral leakage.
+        #
+        # Note that noise power cannot be made window-independent at the same
+        # time; it scales with ``noise_gain`` below, which differs per window
+        # because their equivalent noise bandwidths differ. That is physics,
+        # not a normalisation choice.
+        raw_window = get_window(window_type, n_channels)
+        self.window = raw_window * (n_channels / np.sum(raw_window))
+
+        # Response of one channel to a coherent tone on its exact bin
+        # (== n_channels for every window, by the normalisation above) and to
+        # white noise (window dependent).
+        self.coherent_gain = float(np.sum(self.window))
+        self.noise_gain = float(np.sum(self.window ** 2))
+
         # Compute stride (hop size)
         self.stride = int(n_channels * (1 - overlap_factor))
     

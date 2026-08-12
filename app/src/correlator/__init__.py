@@ -3,7 +3,12 @@ from correlator.config import Config
 from correlator.core.fengine import FEngine
 from correlator.core.xengine import XEngine
 from correlator.core.delay import DelayEngine
-from correlator.core.frontend import SimulatedStream, BatchFileSource
+from correlator.core.frontend import (
+    SimulatedStream,
+    BatchFileSource,
+    PointSource,
+    direction_from_zenith_angle,
+)
 
 __all__ = [
     "Config",
@@ -12,4 +17,6 @@ __all__ = [
     "DelayEngine",
     "SimulatedStream",
     "BatchFileSource",
+    "PointSource",
+    "direction_from_zenith_angle",
 ]

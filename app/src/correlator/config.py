@@ -58,7 +58,28 @@ class Config:
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "Config":
+        """Load a config file.
+
+        Unknown keys are an error rather than being skipped. Silently dropping
+        them means a typo, or a file written for an older schema, produces a
+        run at default settings that looks successful and is not what was
+        asked for — the most expensive kind of failure, because nothing
+        reports it.
+        """
         with open(path) as f:
             data = yaml.safe_load(f) or {}
-        valid = {k for k in cls.__dataclass_fields__}
-        return cls(**{k: v for k, v in data.items() if k in valid})
+
+        if not isinstance(data, dict):
+            raise ValueError(f"{path}: expected a mapping of settings, got {type(data).__name__}")
+
+        valid = set(cls.__dataclass_fields__)
+        unknown = sorted(set(data) - valid)
+        if unknown:
+            raise ValueError(
+                f"{path}: unknown setting(s): {', '.join(unknown)}\n"
+                f"valid settings are: {', '.join(sorted(valid))}"
+            )
+
+        cfg = cls(**data)
+        cfg.validate()
+        return cfg

@@ -42,15 +42,28 @@ def run(cfg: Config) -> int:
 
     # ── Frontend ────────────────────────────────────────────────────────────
     ant_pos_2d = cfg.ant_positions()
+    ant_pos_3d = np.hstack([ant_pos_2d, np.zeros((cfg.n_ants, 1))])
 
     if cfg.mode == "simulate":
         total_samples = int(cfg.duration * cfg.sample_rate)
         max_chunks = max(1, total_samples // chunk_size)
+
+        dropped = total_samples - max_chunks * chunk_size
+        if dropped > 0:
+            print(f"Note: {dropped} of {total_samples} samples not processed "
+                  f"(duration is not a whole number of {chunk_size}-sample chunks; "
+                  f"processing {max_chunks * chunk_size / cfg.sample_rate:.4f} s)")
+            print()
+
+        # Two point sources: one at zenith (the phase centre, so it integrates
+        # up coherently) and one 30 degrees away (so it fringes and averages
+        # down). sky_freq must match the DelayEngine reference_freq below.
         source = SimulatedStream(
             n_ants=cfg.n_ants,
             sample_rate=cfg.sample_rate,
-            ant_positions=ant_pos_2d,
-            source_angles=[0.0, np.pi / 6],   # two point sources
+            ant_positions=ant_pos_3d,
+            source_angles=[0.0, np.pi / 6],
+            sky_freq=cfg.center_freq,
             snr=cfg.snr,
         ).stream(chunk_size=chunk_size, max_chunks=max_chunks)
     else:
@@ -61,9 +74,10 @@ def run(cfg: Config) -> int:
     freq_channels = fengine.get_channel_frequencies(cfg.sample_rate)
 
     # ── Delay engine ─────────────────────────────────────────────────────────
-    ant_pos_3d = np.hstack([ant_pos_2d, np.zeros((cfg.n_ants, 1))])
+    # Phase centre at zenith. For a planar (z=0) array a horizon phase centre
+    # is a grazing, degenerate geometry and should not be the default.
     delay_engine = DelayEngine(ant_positions=ant_pos_3d, reference_freq=cfg.center_freq)
-    delay_engine.set_phase_center(np.array([1.0, 0.0, 0.0]))
+    delay_engine.set_phase_center(np.array([0.0, 0.0, 1.0]))
 
     # ── X-engine ─────────────────────────────────────────────────────────────
     xengine = XEngine(

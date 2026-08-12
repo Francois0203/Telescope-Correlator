@@ -22,3 +22,37 @@ services:
     command: ["pytest", "tests_harness/", "-v", "--tb=short"]
     environment:
       - PYTHONPATH=/workspace/app/src:/usr/local/lib/python3.11/site-packages
+
+  # Full validation: the correlator's own suite, the analytic oracle (Tier 1)
+  # and the pyuvsim cross-check (Tier 2). Self-contained image — it does not
+  # depend on telescope-correlator:latest existing first, so there is no build
+  # ordering to get wrong on a fresh server.
+  validate:
+    build:
+      context: .
+      dockerfile: validation/Dockerfile
+    image: telescope-correlator-validation:latest
+    container_name: telescope-correlator-validation
+    volumes:
+      - ./validation/reports:/app/reports
+    command:
+      - python
+      - run_validation.py
+      - --with-pyuvsim
+      - --json
+      - /app/reports/validation.json
+
+  # Tier 1 only — no pyuvsim, runs in about a second. Same image.
+  validate-quick:
+    image: telescope-correlator-validation:latest
+    build:
+      context: .
+      dockerfile: validation/Dockerfile
+    container_name: telescope-correlator-validation-quick
+    volumes:
+      - ./validation/reports:/app/reports
+    command:
+      - python
+      - run_validation.py
+      - --json
+      - /app/reports/validation-tier1.json

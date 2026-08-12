@@ -49,10 +49,22 @@ Type `run` to run immediately with defaults (4 antennas, 10-second simulation).
 | `run` | Run the FX correlator with current settings |
 | `set KEY VALUE` | Change any setting (see table below) |
 | `config` | Show all settings and their current values |
+| `load FILE` | Load settings from a YAML file |
+| `save FILE` | Save current settings to a YAML file |
 | `list` | List files in `workspace/outputs/` |
 | `plot` | Save an amplitude + phase image of a visibility file |
 | `help` | Full help; `help run`, `help set`, etc. for per-command detail |
 | `quit` | Exit |
+
+Two ready-made configs ship with the project:
+
+```
+correlator> load /workspace/configs/dev/default.yaml    # 8 antennas, simulated
+correlator> load /workspace/configs/prod/default.yaml   # 64 antennas, from file
+```
+
+Unknown keys in a config file are rejected rather than ignored, so a stale or
+misspelt file fails loudly instead of quietly running at defaults.
 
 ---
 
@@ -105,6 +117,12 @@ workspace/outputs/
 
 Baselines are ordered: autocorrelations first `(0,0), (1,1), …` then cross-correlations `(0,1), (0,2), …`
 
+**Amplitude convention.** Window functions are normalised to unit coherent
+gain, so the flux scale does not change when you change `window`. A coherent
+tone of amplitude `A` landing on an exact channel gives a visibility amplitude
+of `(A × n_channels)²` — the FFT carries no `1/N`, and flux calibration
+absorbs the constant. Autocorrelations are exactly real.
+
 | Antennas | Baselines |
 |----------|-----------|
 | 2 | 3 |
@@ -143,6 +161,59 @@ docker compose run --rm test         # run test suite
 ./correlator test       # Linux
 correlator.bat test     # Windows
 ```
+
+---
+
+## Validation
+
+Beyond the test suite there is an external harness that checks the correlator's
+output against an independently derived analytic prediction, and against
+[pyuvsim](https://github.com/RadioAstronomySoftwareGroup/pyuvsim), the Radio
+Astronomy Software Group's reference simulator.
+
+Everything runs in Docker — the only host requirement is Docker with the
+Compose plugin, and nothing is installed on the machine:
+
+```bash
+./validate.sh              # 72 tests + analytic oracle + pyuvsim cross-check
+./validate.sh quick        # analytic oracle only, ~1 second
+./validate.sh tests        # the correlator's pytest suite
+./validate.sh diagnose     # classify a pyuvsim disagreement
+./validate.sh shell        # interactive shell in the validation image
+```
+
+Or through compose directly:
+
+```bash
+docker compose run --rm validate         # both tiers
+docker compose run --rm validate-quick   # analytic oracle only
+```
+
+Current result: **6/6 scenarios agree with the analytic prediction to ~1e-11**,
+and visibilities agree with **pyuvsim 1.4.2 to 2.2e-07** — which is pyuvsim's
+own float32 precision floor, not a correlator error. JSON reports land in
+`validation/reports/`.
+
+The harness is optional and detachable: nothing in `app/src` imports it, and
+the correlator's own image does not contain it. See
+[validation/README.md](validation/README.md) for what it does and does not
+cover, and for the three pyuvsim convention traps it handles.
+
+### On an Ubuntu server
+
+```bash
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2
+sudo usermod -aG docker "$USER" && newgrp docker    # then re-login
+
+git clone <your-repo> && cd Telescope-Correlator
+./validate.sh
+```
+
+The validation image is self-contained (`FROM python:3.11-slim`, installs
+MPI and the correlator itself), so it builds standalone with no prior images
+and no build ordering to remember. It runs as a non-root user and needs no
+network at runtime — astropy's Earth-rotation data is baked in and auto-download
+is disabled, so it works air-gapped.
 
 ---
 

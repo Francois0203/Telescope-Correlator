@@ -1,5 +1,5 @@
 #!/bin/bash
-# Telescope Correlator — usage: ./correlator [build|test|help]
+# Telescope Correlator — usage: ./correlator [build|test|validate|help]
 
 IMAGE="telescope-correlator"
 
@@ -19,12 +19,19 @@ case "${1:-start}" in
             -w /workspace "$IMAGE" pytest tests_harness/ -v
         ;;
 
+    validate)
+        # Separate image with the pyuvsim reference stack; see validation/.
+        exec ./validate.sh "${2:-full}"
+        ;;
+
     help|-h|--help)
-        echo "Usage: ./correlator [build|test|help]"
-        echo "  build   Build the Docker image"
-        echo "  test    Run the test suite"
-        echo "  help    Show this message"
-        echo "  (none)  Start the interactive CLI  (default)"
+        echo "Usage: ./correlator [build|test|validate|help]"
+        echo "  build      Build the Docker image"
+        echo "  test       Run the test suite"
+        echo "  validate   Validate against analytic theory and pyuvsim"
+        echo "             (add 'quick' to skip pyuvsim)"
+        echo "  help       Show this message"
+        echo "  (none)     Start the interactive CLI  (default)"
         ;;
 
     start|"")

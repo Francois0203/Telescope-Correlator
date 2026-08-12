@@ -119,11 +119,17 @@ where:
 #### Delay Compensation
 Correct for geometric delays:
 ```
-Ṽ'_i[k] = Ṽ_i[k] · exp(-2πj · f_k · τ_i)
+Ṽ'_i[k] = Ṽ_i[k] · exp(-2πj · (f_sky + f_k) · a_i)
 ```
 where:
-- `f_k` = frequency of channel k
-- `τ_i` = geometric delay for antenna i
+- `f_sky` = sky (RF) frequency the band was mixed down from (`center_freq`)
+- `f_k` = baseband offset of channel k
+- `a_i` = geometric advance of antenna i, in seconds
+
+> **The `f_sky` term is not optional.** For a 1.42 GHz observation with a few
+> kHz of bandwidth it exceeds the `f_k` term by six orders of magnitude.
+> Rotating by `f_k` alone — as an earlier version of this code did — discards
+> the entire fringe rather than introducing a small error.
 
 #### X-Engine: Correlation
 Compute visibilities for baseline (i,j):
@@ -185,23 +191,38 @@ Each value represents a complex voltage measurement at a single time instant.
 
 The simulator generates signals for multiple sources:
 
+The simulator produces **complex baseband voltages** — what a receiver yields
+after mixing the sky signal down from `sky_freq` — using the same conventions
+as the delay engine, so that fringe stopping has something real to undo.
+
 ```python
-# For each source at angle θ
-phase_offset[i] = (r_i · ŝ) / λ
+# Geometric advance of antenna i toward a source at unit direction ŝ:
+a_i = (r_i · ŝ) / c            # seconds
+
+# Voltage at antenna i:
+x_i(t) = s(t + a_i) · exp(+2πj · f_sky · a_i)
 
 # Where:
-# r_i = antenna position vector
-# ŝ = unit vector to source = [cos(θ), sin(θ)]
-# λ = wavelength
-
-# Signal at antenna i:
-V_i(t) = Σ_sources [ exp(-2πj·phase_offset) · exp(2πj·f·t) ] + noise
+# r_i    = antenna position vector (metres, x=East y=North z=Up)
+# ŝ      = unit vector toward the source, zenith = [0, 0, 1]
+# s(t)   = baseband envelope, shared by all antennas
+# f_sky  = sky frequency the band was mixed down from
 ```
 
+Receiver noise is added **independently per antenna** afterwards, so it
+correlates only on the autocorrelations — which is what makes a cross-
+correlation a measurement rather than a power meter.
+
+> An earlier version applied `exp(-2πj · (r_i · ŝ))`, treating antenna
+> positions in metres as though they were wavelengths, with no `c` and no
+> frequency dependence. That model could not be cancelled by the delay engine
+> under any parameters, because the two used different unit systems.
+
 **Key Features:**
-- Multiple simultaneous sources
-- Configurable SNR (signal-to-noise ratio)
-- Realistic phase relationships between antennas
+- Multiple simultaneous point sources, each with its own direction and amplitude
+- Coherent tone or band-limited Gaussian noise envelopes
+- Configurable SNR in dB
+- Physically correct geometric delays and fringe phases
 - Optional real-time streaming simulation
 
 ### F-Engine (Channelizer)
@@ -215,9 +236,26 @@ Converts time-domain signals to frequency domain using windowed FFT, producing n
 
 For each antenna:
 1. Extract overlapping windows of length `n_channels`
-2. Apply window function (e.g., Hanning)
+2. Apply window function (e.g., Hanning), normalised to unit coherent gain
 3. Compute FFT of each window
 4. Optionally apply quantization
+
+#### Amplitude Normalisation
+
+Windows are scaled by `n_channels / sum(w)` before use. Without this, a taper
+attenuates coherent signals by `sum(w)/N` — about 0.5 for Hanning — so merely
+changing `window` would rescale every visibility and, with it, the flux scale.
+
+| Signal | Channel response |
+|---|---|
+| coherent tone on an exact bin | `A · n_channels` — identical for every window |
+| white noise, variance `σ²` | `σ² · sum(w²)` — window dependent |
+
+Noise power cannot be made window-independent at the same time, because
+equivalent noise bandwidths genuinely differ. `FEngine` exposes both figures
+as `coherent_gain` and `noise_gain`. The FFT itself carries no `1/N`, so
+visibility amplitudes scale as `n_channels²`; flux calibration absorbs the
+constant.
 
 #### Window Functions
 
@@ -232,8 +270,12 @@ For each antenna:
   - **Recommended for most applications**
   
 - **Hamming**: `w[n] = 0.54 - 0.46·cos(2πn/N)`
-  - Pros: Better sidelobe suppression than Hanning
-  - Cons: Slightly less smooth
+  - Pros: Lower *first* sidelobe than Hanning (−43 dB vs −31 dB)
+  - Cons: Far-field rolloff is worse — `1/d²` against Hanning's `1/d³`, so it
+    leaks substantially more power far from the peak. Measured at ~400× more
+    than Hanning beyond 8 channels (`test_windows_suppress_spectral_leakage`).
+    Prefer Hanning or Blackman when distant leakage matters, which for RFI
+    rejection it usually does.
   
 - **Blackman**: `w[n] = 0.42 - 0.5·cos(2πn/N) + 0.08·cos(4πn/N)`
   - Pros: Excellent sidelobe suppression
@@ -298,23 +340,35 @@ Corrects for geometric time delays caused by different path lengths from a sourc
 For a source at direction `ŝ` (unit vector):
 ```
 Path difference to antenna i: Δl_i = r_i · ŝ - r_0 · ŝ
-Geometric delay: τ_i = Δl_i / c
+Geometric advance:            a_i  = Δl_i / c
 ```
 
 where:
-- `r_i` = position of antenna i (meters)
+- `r_i` = position of antenna i (metres, x=East y=North z=Up)
 - `r_0` = reference antenna position
-- `c` = speed of light (3×10⁸ m/s)
-- `ŝ` = [sx, sy, sz] unit vector to source
+- `c` = speed of light (`scipy.constants.c`, not 3×10⁸)
+- `ŝ` = [sx, sy, sz] unit vector toward the source, zenith = `[0, 0, 1]`
+
+`a_i` is how much *earlier* the wavefront reaches antenna i than the array
+origin. Referencing to antenna 0 keeps the numbers small and has no effect on
+visibilities: a common offset cancels in every baseline difference `a_i - a_j`.
 
 #### Phase Rotation
 
 To compensate delay, apply phase rotation in frequency domain:
 ```
-Ṽ'_i[k] = Ṽ_i[k] · exp(-2πj · f[k] · τ_i)
+Ṽ'_i[k] = Ṽ_i[k] · exp(-2πj · (f_sky + f[k]) · a_i)
 ```
 
-This "stops the fringes" by aligning all antenna phases to a common reference direction.
+This "stops the fringes" by aligning all antenna phases to a common reference
+direction. After fringe stopping toward `s0`, a point source at `ŝ` gives
+
+```
+V_ij[k] = A · exp(+2πj · (f_sky + f[k]) · b_ij · (ŝ - s0) / c),   b_ij = r_i - r_j
+```
+
+which is zero-phase when `ŝ == s0`. That closed form is what the validation
+harness asserts against; see [`validation/README.md`](validation/README.md).
 
 #### Phase Center
 
@@ -499,7 +553,7 @@ The `Config` class also provides:
 - `ant_positions()` — returns an `(n_ants, 2)` array of antenna positions on a uniform circle of radius `ant_radius`
 - `to_yaml(path)` / `from_yaml(path)` — save and load settings as YAML
 
-> **Note:** Antenna positions are always auto-generated as a uniform circle from `n_ants` and `ant_radius`; explicit per-antenna positions are not currently a configurable setting. Source angles for simulation are fixed in the pipeline (`[0.0, π/6]`), the delay phase centre is fixed to `[1.0, 0.0, 0.0]`, and quantization/overlap are not exposed (see the F-engine notes above).
+> **Note:** Antenna positions are always auto-generated as a uniform circle from `n_ants` and `ant_radius`; explicit per-antenna positions are not currently a configurable setting. Source angles for simulation are fixed in the pipeline (`[0.0, π/6]`, as zenith angles), the delay phase centre is fixed to zenith `[0.0, 0.0, 1.0]`, and quantization/overlap are not exposed (see the F-engine notes above). The `DelayEngine` and `SimulatedStream` classes accept arbitrary 3-D geometry and phase centres directly — only the `Config`/shell surface is restricted.
 
 ## Configuration System
 
@@ -761,12 +815,17 @@ Tests live in `tests_harness/` and run with `pytest tests_harness/ -v`, or throu
 
 ```
 tests_harness/
-├── unit/          # test_fengine, test_xengine, test_delay, test_frontend, test_accuracy
-├── integration/   # test_fx_pipeline, test_astronomical_accuracy
-└── generators/    # shared synthetic-signal helpers
+├── unit/          # test_fengine, test_xengine, test_delay, test_frontend,
+│                  # test_accuracy, test_config
+└── integration/   # test_fx_pipeline, test_astronomical_accuracy,
+                   # test_correlator_validation
 ```
 
-**Unit Tests** — exercise individual components in isolation: window functions and FFT output shape/Parseval (`test_fengine`), baseline count/ordering and autocorrelation reality/Hermitian symmetry (`test_xengine`), geometric delays for zenith/horizon sources (`test_delay`), and the simulated/batch data sources (`test_frontend`).
+Synthetic signals come from `correlator.core.frontend.SimulatedStream`, which
+is the same generator the pipeline uses, so tests exercise the production code
+path rather than a parallel one that can drift away from it.
+
+**Unit Tests** — exercise individual components in isolation: window functions and FFT output shape/Parseval (`test_fengine`), baseline count/ordering and autocorrelation reality/Hermitian symmetry (`test_xengine`), geometric delays for zenith/horizon sources (`test_delay`), the simulated/batch data sources (`test_frontend`), and config loading including rejection of unknown keys (`test_config`).
 
 **Integration Tests** — run the full FX pipeline end-to-end:
 ```python
@@ -777,7 +836,17 @@ def test_end_to_end_pipeline():
     # ... assert visibility files were written
 ```
 
-**Accuracy / Validation Tests** — compare results to analytical expectations, e.g. that a point source at zenith produces zero geometric delay, and that recovered visibility phases match the injected source geometry (`test_accuracy`, `test_astronomical_accuracy`).
+**Accuracy / Validation Tests** — compare results to values derived independently of the correlator (`test_accuracy`, `test_astronomical_accuracy`, `test_correlator_validation`):
+
+- **Off-pointing phase.** The load-bearing test. Deliberately mis-point the phase centre by a known angle and assert the residual fringe matches `2π(f_sky + f_k)·b_ij·(ŝ − s0)/c`. A source *at* the phase centre gives zero phase — but so does a delay engine that does nothing, so an on-axis test alone proves nothing.
+- **Closure phase.** `arg(V_ij) + arg(V_jk) − arg(V_ik)` must vanish for a point source, and must keep vanishing when arbitrary per-antenna phase errors are injected.
+- **FX versus XF.** Cross-check against a lag-domain correlator that shares no code with `FEngine` or `XEngine`.
+- **Invariants.** Cauchy–Schwarz (`|V_ij|² ≤ V_ii·V_jj`), conjugate symmetry, autocorrelation reality, amplitude preservation under fringe stopping.
+- **Window behaviour.** Amplitude independence across windows, plus a spectral-leakage test — since coherent-gain normalisation makes the on-bin amplitude window-independent, only leakage can show that windowing happens at all.
+
+> **On test geometry.** Use irregular, genuinely 3-D antenna layouts. An earlier version of this suite passed while testing nothing: the simulator defaulted to a 10 m circle at integer coordinates, its geometric term `exp(-2πj·x)` was identically 1 for integer `x`, every antenna received the same signal, and the phase centre was orthogonal to the planar array so the delay stage was a no-op. The tests then asserted the phase was zero. They could not fail.
+
+**External validation** — [`validation/`](validation/) holds an optional harness that re-derives expected visibilities from the measurement equation independently of the correlator, and can cross-check against [pyuvsim](https://github.com/RadioAstronomySoftwareGroup/pyuvsim). It is detachable: nothing in `app/src` imports it and it is excluded from the Docker image.
 
 ### Console Output
 

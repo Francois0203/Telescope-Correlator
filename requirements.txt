@@ -1,8 +1,17 @@
-# Minimal requirements for telescope correlator (to be refined after implementation)
+# Runtime dependencies for the telescope correlator.
 numpy>=1.25
 scipy>=1.11
-matplotlib>=3.8
 pyyaml>=6.0
-pytest>=8.0
+
+# Optional in principle, installed by default in practice: matplotlib backs the
+# shell's 'plot' command, h5py and astropy back output_format=hdf5 and =fits.
+# Each is imported lazily and degrades with a warning if absent.
+matplotlib>=3.8
 h5py>=3.10
 astropy>=6.0
+
+# Test runner.
+pytest>=8.0
+
+# The external validation harness has its own, heavier requirements; see
+# validation/requirements.txt. It is not needed to run the correlator.

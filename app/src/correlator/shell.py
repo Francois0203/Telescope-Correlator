@@ -36,6 +36,8 @@ Telescope Correlator  —  FX Architecture
   run             Run the correlator with current settings
   set KEY VALUE   Change a setting
   config          Show all settings
+  load FILE       Load settings from a YAML file
+  save FILE       Save settings to a YAML file
   list            List output files
   plot [FILE]     Plot visibility amplitude and phase
   help [CMD]      Show help
@@ -132,6 +134,56 @@ Type 'config' to see all settings and their current values."""
             print(f"  {key:<20} {str(val):<22} {desc}")
         print()
 
+    # ─── load / save ────────────────────────────────────────────────────────
+    def do_load(self, arg):
+        """Load settings from a YAML file.
+
+Usage:  load <path>
+
+Examples:
+  load /workspace/configs/dev/default.yaml
+  load /workspace/configs/prod/default.yaml
+
+Unknown keys are rejected rather than ignored, so a stale or misspelt file
+fails loudly instead of quietly running with defaults."""
+        parts = shlex.split(arg) if arg else []
+        if len(parts) != 1:
+            print("Usage: load <path>")
+            return
+
+        path = Path(parts[0])
+        if not path.exists():
+            print(f"File not found: {path}")
+            return
+
+        try:
+            self.cfg = Config.from_yaml(path)
+        except Exception as exc:
+            print(f"Could not load {path}:")
+            print(f"  {exc}")
+            return
+
+        print(f"Loaded {path}")
+        self.do_config("")
+
+    def do_save(self, arg):
+        """Save current settings to a YAML file.
+
+Usage:  save <path>"""
+        parts = shlex.split(arg) if arg else []
+        if len(parts) != 1:
+            print("Usage: save <path>")
+            return
+
+        path = Path(parts[0])
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self.cfg.to_yaml(path)
+        except OSError as exc:
+            print(f"Could not write {path}: {exc}")
+            return
+        print(f"Saved {path}")
+
     # ─── list ───────────────────────────────────────────────────────────────
     def do_list(self, _arg):
         """List output files."""
@@ -221,6 +273,8 @@ Commands
   run              Run the FX correlator with current settings
   set KEY VALUE    Change a setting  (type 'config' to see all keys)
   config           Show all settings and their current values
+  load FILE        Load settings from a YAML file
+  save FILE        Save current settings to a YAML file
   list             List files in the output directory
   plot [FILE]      Save amplitude + phase plot of a visibility file
   help [CMD]       Show this help, or help for a specific command

@@ -24,6 +24,13 @@ wheels/
 *.egg
 MANIFEST
 
+# validation/ stays in the build context because validation/Dockerfile needs
+# it. It is not copied into the correlator image — app/Dockerfile only takes
+# requirements.txt and app/src/ — so the runtime image is unaffected.
+
+# Reports written by the validation container.
+validation/reports/
+
 # Test data and outputs
 tests_harness/test_data/
 dev_workspace/outputs/

@@ -7,6 +7,65 @@ on:
     branches: [ main ]
 
 jobs:
+  validate:
+    # Tier 1 of the external validation harness. Needs only numpy/scipy, so it
+    # runs natively and gives fast feedback before the Docker build.
+    name: Analytic validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Unit and integration tests
+        run: PYTHONPATH=app/src python -m pytest tests_harness/ -q
+
+      - name: Validate against the analytic oracle
+        run: python validation/run_validation.py --json validation-results.json
+
+      - name: Upload validation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-results
+          path: validation-results.json
+
+  validate-pyuvsim:
+    # Tier 2 in the container: cross-check against pyuvsim. Slower than the
+    # native job because it builds the MPI + astropy + numba stack, so it runs
+    # in parallel with, not before, the others.
+    name: pyuvsim cross-check (Docker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build validation image
+        run: docker build -f validation/Dockerfile -t telescope-correlator-validation:latest .
+
+      - name: Correlator test suite in the validation image
+        run: |
+          docker run --rm telescope-correlator-validation:latest \
+            python -m pytest ../tests_harness -q -p no:cacheprovider
+
+      - name: Tier 1 + Tier 2
+        run: |
+          mkdir -p validation/reports
+          docker run --rm -v "$PWD/validation/reports:/app/reports" \
+            telescope-correlator-validation:latest \
+            python run_validation.py --with-pyuvsim --json ../reports/validation.json
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyuvsim-validation-report
+          path: validation/reports/
+
   test:
     name: Run tests in Docker
     runs-on: ubuntu-latest
@@ -17,29 +76,40 @@ jobs:
       - name: Build Docker image
         run: docker compose build
 
-      - name: Create test output directory
-        run: mkdir -p dev_workspace/outputs
+      - name: Create output directory
+        run: mkdir -p workspace/outputs
 
       - name: Run tests in Docker
-        run: |
-          docker compose run --rm test
+        run: docker compose run --rm test
 
+      # `python -m correlator` starts the interactive shell and takes no
+      # arguments. An earlier version of this workflow passed --n-ants and
+      # friends to it, which had not existed since the CLI was removed, and
+      # then looked for output under dev_workspace/ while docker-compose
+      # mounts ./workspace. Drive the pipeline directly instead.
       - name: Test correlator functionality
         run: |
-          docker compose run --rm correlator python -m correlator --n-ants 4 --n-channels 64 --sim-duration 0.5 --output-dir /app/outputs
+          docker compose run --rm correlator python -c "
+          import sys
+          from correlator.config import Config
+          from correlator import pipeline
+          sys.exit(pipeline.run(Config(
+              n_ants=4, n_channels=64, duration=1.0,
+              output_dir='/workspace/outputs')))
+          "
 
       - name: Verify outputs were created
         run: |
-          ls -la dev_workspace/outputs/
-          if [ ! -f "dev_workspace/outputs/visibility_0001.npy" ]; then
-            echo "Error: Correlator did not produce expected output"
+          ls -la workspace/outputs/
+          if [ ! -f "workspace/outputs/visibility_0001.npy" ]; then
+            echo "Error: correlator did not produce expected output"
             exit 1
           fi
-          echo "✓ Correlator successfully generated visibility data"
+          echo "Correlator successfully generated visibility data"
 
-      - name: Upload test results
+      - name: Upload correlator outputs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
-          path: dev_workspace/outputs/
+          name: correlator-outputs
+          path: workspace/outputs/

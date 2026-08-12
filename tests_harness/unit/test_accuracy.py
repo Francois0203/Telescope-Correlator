@@ -1,6 +1,7 @@
 """Accuracy validation tests using known analytical solutions."""
 import numpy as np
 import pytest
+from scipy.constants import c as C_LIGHT
 from correlator.core.fengine import FEngine
 from correlator.core.xengine import XEngine
 from correlator.core.delay import DelayEngine
@@ -23,17 +24,17 @@ class TestCorrelatorAccuracy:
         delays = delay_engine.get_delays(1.0)
         assert np.allclose(delays, 0.0, atol=1e-10)
 
-        # Point source at 45 degrees east
-        # For 100m baseline, geometric delay should be ~0.33ns
-        source_dir = np.array([1, 0, 1]) / np.sqrt(2)  # 45 deg elevation, 0 deg azimuth
+        # Point source at 45 degrees elevation, 0 deg azimuth
+        source_dir = np.array([1, 0, 1]) / np.sqrt(2)
         delay_engine.set_phase_center(source_dir)
-        delays = delay_engine.get_delays(1.0)  # 1 GHz = 1e9 Hz
+        delays = delay_engine.get_delays()
 
-        # Expected delay for antenna 1 relative to antenna 0
-        # Delay = (baseline · source_vector) / c
-        c = 3e8  # speed of light
-        expected_delay = (100 * np.cos(np.pi/4)) / c  # projection onto source direction
-        assert np.abs(delays[1] - expected_delay) < 1e-12
+        # Expected advance for antenna 1 relative to antenna 0:
+        #   a = (baseline . source_unit_vector) / c
+        # Use the same constant the engine uses — a 3e8 approximation is wrong
+        # by 7e-4 relative, which swamps a 1e-12 absolute tolerance.
+        expected_delay = (100 * np.cos(np.pi / 4)) / C_LIGHT
+        assert np.abs(delays[1] - expected_delay) < 1e-15
 
     def test_fft_accuracy(self):
         """Test FFT accuracy with known sinusoidal input."""

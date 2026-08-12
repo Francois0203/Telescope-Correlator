@@ -1,0 +1,18 @@
+# Tier 2 only. Tier 1 (the analytic oracle) needs nothing beyond the
+# correlator's own numpy/scipy, so the whole file is optional.
+#
+#     pip install -r validation/requirements.txt
+#
+# These are heavy (astropy pulls in a large dependency tree) and are
+# deliberately kept out of the correlator's requirements.txt and its Docker
+# image. Nothing in app/src imports them.
+
+# The [sim] extra pulls in mpi4py, which pyuvsim.uvsim requires even for a
+# single-process run. mpi4py needs an MPI implementation present at build
+# time (libopenmpi-dev in validation/Dockerfile). That is the main reason to
+# run this tier in a container rather than on a workstation — on Windows it
+# means installing MS-MPI by hand.
+pyuvsim[sim]>=1.4
+pyuvdata>=3.0
+pyradiosky>=1.0
+astropy>=6.0

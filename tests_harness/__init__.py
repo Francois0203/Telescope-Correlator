@@ -3,4 +3,4 @@
 This file makes `tests_harness` importable during CI and local test runs.
 """
 
-__all__ = ["generators", "unit"]
+__all__ = ["unit", "integration"]
