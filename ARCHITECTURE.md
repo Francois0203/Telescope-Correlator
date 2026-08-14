@@ -41,10 +41,10 @@ The correlator converts time-domain voltage signals from multiple antennas into 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        DATA SOURCES                              │
+│                        DATA SOURCES                             │
 ├─────────────────────────────────────────────────────────────────┤
-│      Simulated Stream      │      File (Batch .npy)              │
-│  (mode=simulate)           │      (mode=file)                    │
+│      Simulated Stream      │      File (Batch .npy)             │
+│  (mode=simulate)           │      (mode=file)                   │
 └───────────┬────────────────────────────┬────────────────────────┘
             │                            │
             └──────────────┬─────────────┘
