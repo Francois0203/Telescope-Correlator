@@ -130,7 +130,7 @@ def run_correlator(sc: Scenario) -> np.ndarray:
                    integration_time=1e9, sample_rate=sc.sample_rate)
 
     # The oracle assumes the correlator's baseline ordering. Check it rather
-    # than trust it — a silent reordering would look like a phase error.
+    # than trust it. A silent reordering would look like a phase error.
     if xeng.baselines != sc.baselines:
         raise AssertionError(
             "baseline ordering mismatch between correlator and oracle:\n"
@@ -224,7 +224,7 @@ def compare(sc: Scenario, measured: np.ndarray, expected: np.ndarray) -> Result:
 
 def print_report(results: list[Result]) -> None:
     print()
-    print("Tier 1 — analytic oracle (independent implementation of the")
+    print("Tier 1: analytic oracle (independent implementation of the")
     print("         measurement equation; shares no code with the correlator)")
     print()
     header = (f"{'scenario':<48}{'bl':>4}{'max dphase':>12}"
@@ -249,11 +249,11 @@ def print_report(results: list[Result]) -> None:
     print()
     print("  fringe    spread of predicted phase across baselines. Near zero means")
     print("            the scenario cannot tell a working delay engine from a no-op;")
-    print("            such rows are marked pass* — necessary, not sufficient.")
+    print("            such rows are marked pass*: necessary, not sufficient.")
     print("  amp bias  mean(|V_measured| / |V_predicted|) - 1. A systematic scale")
     print("            error shows up here even when the scatter looks healthy.")
     print("  scatter   std of that ratio. For noise scenarios it must match the")
-    print("            theoretical 1/sqrt(N_spectra) — too small is as suspicious")
+    print("            theoretical 1/sqrt(N_spectra). Too small is as suspicious")
     print("            as too large.")
 
 

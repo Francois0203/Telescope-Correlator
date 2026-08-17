@@ -133,18 +133,15 @@ class FEngine:
 
         # Pre-compute the window, normalised to unit coherent gain.
         #
-        # An unnormalised taper attenuates coherent signals by sum(w)/N — a
-        # factor of about 0.5 for Hanning — so simply changing the window
-        # would rescale every visibility amplitude and, with it, the flux
-        # scale. Scaling by N/sum(w) makes the response to a coherent signal
-        # (a spectral line, a point source on an exact bin) identical for
-        # every window, leaving the window to do only what it is for:
-        # controlling spectral leakage.
+        # An unnormalised taper attenuates coherent signals by sum(w)/N, about
+        # 0.5 for Hanning. Without normalisation, changing the window would
+        # rescale every visibility amplitude and the flux scale with it.
+        # Scaling by N/sum(w) makes the coherent response identical for every
+        # window, so the window only controls spectral leakage.
         #
-        # Note that noise power cannot be made window-independent at the same
-        # time; it scales with ``noise_gain`` below, which differs per window
-        # because their equivalent noise bandwidths differ. That is physics,
-        # not a normalisation choice.
+        # Noise power cannot be window-independent at the same time. It scales
+        # with ``noise_gain`` below, which differs per window because their
+        # equivalent noise bandwidths differ. That is physics, not a choice.
         raw_window = get_window(window_type, n_channels)
         self.window = raw_window * (n_channels / np.sum(raw_window))
 

@@ -16,7 +16,7 @@ from correlator import pipeline
 _SETTINGS: dict[str, tuple[str, type, object, object]] = {
     "n_ants":           ("Number of antennas",              int,   2,    64),
     "ant_radius":       ("Array radius (metres)",            float, 1.0,  10_000.0),
-    "n_channels":       ("FFT channels — must be power of 2", int, 32,   4096),
+    "n_channels":       ("FFT channels, power of 2",          int,   32,   4096),
     "window":           ("Window function",                  str,   None, None),
     "integration_time": ("Integration time (seconds)",       float, 0.1,  3600.0),
     "sample_rate":      ("Sample rate (Hz)",                 float, 1.0,  1e9),
@@ -31,7 +31,7 @@ _SETTINGS: dict[str, tuple[str, type, object, object]] = {
 
 _BANNER = """\
 
-Telescope Correlator  —  FX Architecture
+Telescope Correlator  ::  FX Architecture
 =========================================
   run             Run the correlator with current settings
   set KEY VALUE   Change a setting

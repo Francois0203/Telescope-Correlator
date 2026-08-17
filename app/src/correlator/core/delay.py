@@ -1,41 +1,36 @@
-"""Delay Compensation and Phasing Module
+"""Geometric delay compensation (fringe stopping).
 
-Implements geometric delay compensation (fringe stopping) for antenna arrays.
+Conventions
+-----------
+Stated explicitly, because getting them wrong is the most common source of
+silent correlator errors.
 
-Sign and unit conventions
--------------------------
-These are stated explicitly because getting them wrong is the single most
-common source of silent correlator errors.
+* Antenna positions ``r_i``: metres, shape ``(n_ants, 3)``, right-handed
+  local frame (x=East, y=North, z=Up).
+* Source direction ``s_hat``: unit vector from the array toward the source.
+  Zenith is ``[0, 0, 1]``.
+* Geometric advance of antenna *i*, in seconds::
 
-* Antenna positions ``r_i`` are in **metres**, in a right-handed local frame
-  (x = East, y = North, z = Up).  Shape ``(n_ants, 3)``.
-* A source direction ``s_hat`` is a **unit vector pointing from the array
-  toward the source**.  Zenith is ``[0, 0, 1]``.
-* The **geometric advance** of antenna *i* is
+      a_i(s_hat) = (r_i . s_hat) / c
 
-      a_i(s_hat) = (r_i . s_hat) / c        [seconds]
-
-  This is the amount of time by which the incoming wavefront reaches antenna
-  *i* *before* it reaches the array origin.  An antenna displaced toward the
-  source has a positive advance.
-* A receiver observing at sky frequency ``f_sky`` and mixing down to complex
-  baseband sees, in channel with baseband frequency ``f_ch``:
+  How far ahead of the array origin the wavefront reaches antenna *i*.
+  Positive when the antenna is displaced toward the source.
+* At sky frequency ``f_sky``, mixed to baseband channel ``f_ch``::
 
       X_i[k] = S[k] * exp(+2j*pi * (f_sky + f_ch) * a_i)
 
-  Note that **both** the sky frequency and the channel frequency appear.  For
-  a 1.42 GHz observation with a 1 kHz bandwidth, the ``f_sky`` term dominates
-  the ``f_ch`` term by six orders of magnitude — omitting it does not
-  introduce a small error, it discards the entire fringe.
-* Fringe stopping toward a phase centre ``s0`` therefore multiplies each
-  antenna by ``exp(-2j*pi * (f_sky + f_ch) * a_i(s0))``.
+  Both terms appear. At 1.42 GHz over 1 kHz of bandwidth, ``f_sky`` beats
+  ``f_ch`` by six orders of magnitude. Dropping it discards the whole
+  fringe, not a small correction.
+* Fringe stopping toward phase centre ``s0`` multiplies each antenna by
+  ``exp(-2j*pi * (f_sky + f_ch) * a_i(s0))``.
 
-With those conventions, for a point source at ``s_hat`` the visibility on
-baseline ``b_ij = r_i - r_j`` after fringe stopping toward ``s0`` is
+For a point source at ``s_hat``, the visibility on baseline
+``b_ij = r_i - r_j`` after stopping toward ``s0`` is::
 
     V_ij[k] = |S[k]|^2 * exp(+2j*pi * (f_sky + f_ch) * b_ij . (s_hat - s0) / c)
 
-which is zero-phase when ``s_hat == s0``.  That closed form is what
+Zero phase when ``s_hat == s0``. That closed form is what
 ``tests_harness/integration/test_correlator_validation.py`` asserts against.
 """
 from __future__ import annotations
@@ -89,8 +84,8 @@ class DelayEngine:
         Args:
             ant_positions: Antenna positions in metres, shape (n_ants, 3).
             reference_freq: Sky (RF) frequency in Hz that baseband was mixed
-                down from.  This is *not* decorative — it sets the dominant
-                term in the fringe phase.  Pass ``Config.center_freq``.
+                down from. Sets the dominant term in the fringe phase, so it
+                is not optional. Pass ``Config.center_freq``.
         """
         self.ant_positions = np.asarray(ant_positions, dtype=float)
         self.n_ants = self.ant_positions.shape[0]

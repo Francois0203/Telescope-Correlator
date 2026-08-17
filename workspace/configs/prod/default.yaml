@@ -1,4 +1,4 @@
-# Production configuration — processing recorded telescope data.
+# Production configuration: processing recorded telescope data.
 #
 # Load from the shell with:   load /workspace/configs/prod/default.yaml
 #

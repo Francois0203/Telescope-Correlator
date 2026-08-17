@@ -81,7 +81,7 @@ class TestAstronomicalAccuracy:
         advance = np.dot(ant_pos[1] - ant_pos[0], s_hat) / C_LIGHT
         uncorrected_phase = 2 * np.pi * (sky_freq + tone_freq) * advance
         assert np.abs(_wrap(uncorrected_phase)) > 0.5, (
-            "geometry produces no fringe — this test would pass trivially"
+            "geometry produces no fringe, so this test would pass trivially"
         )
 
         # Having removed it, the residual phase must be zero.
@@ -157,8 +157,8 @@ class TestAstronomicalAccuracy:
         sky_freq = 1.42e9
         # Both bins must be below Nyquist (n_channels/2). A tone above Nyquist
         # aliases, and the correlator then de-rotates the aliased channel
-        # frequency while the source sits at the un-aliased one — leaving a
-        # residual phase of 2*pi*sample_rate*advance. That is correct
+        # frequency while the source sits at the un-aliased one. That leaves
+        # a residual phase of 2*pi*sample_rate*advance, which is correct
         # behaviour for an invalid input, not a correlator bug.
         bins = (37, 101)
 

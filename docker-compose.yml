@@ -24,8 +24,8 @@ services:
       - PYTHONPATH=/workspace/app/src:/usr/local/lib/python3.11/site-packages
 
   # Full validation: the correlator's own suite, the analytic oracle (Tier 1)
-  # and the pyuvsim cross-check (Tier 2). Self-contained image — it does not
-  # depend on telescope-correlator:latest existing first, so there is no build
+  # and the pyuvsim cross-check (Tier 2). The image is self-contained and does
+  # not need telescope-correlator:latest to exist first, so there is no build
   # ordering to get wrong on a fresh server.
   validate:
     build:
@@ -42,7 +42,7 @@ services:
       - --json
       - /app/reports/validation.json
 
-  # Tier 1 only — no pyuvsim, runs in about a second. Same image.
+  # Tier 1 only, no pyuvsim. Runs in about a second. Same image.
   validate-quick:
     image: telescope-correlator-validation:latest
     build:

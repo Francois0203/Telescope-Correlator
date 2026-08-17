@@ -30,9 +30,9 @@ class TestRoundTrip:
 class TestUnknownKeys:
     """Unknown keys must fail loudly.
 
-    They used to be filtered out silently, which meant a stale file — such as
-    the shipped configs, written against an older schema — produced a run at
-    default settings that looked entirely successful.
+    They used to be filtered out silently. A stale file, such as the shipped
+    configs written against an older schema, then produced a run at default
+    settings that looked entirely successful.
     """
 
     def test_unknown_key_is_rejected(self, tmp_path):

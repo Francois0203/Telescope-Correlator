@@ -45,3 +45,6 @@ validation/reports/
 
 # Visualization outputs
 *.png
+
+# Dissertation Files
+/Dissertation/

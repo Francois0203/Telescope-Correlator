@@ -8,10 +8,9 @@
 # image. Nothing in app/src imports them.
 
 # The [sim] extra pulls in mpi4py, which pyuvsim.uvsim requires even for a
-# single-process run. mpi4py needs an MPI implementation present at build
-# time (libopenmpi-dev in validation/Dockerfile). That is the main reason to
-# run this tier in a container rather than on a workstation — on Windows it
-# means installing MS-MPI by hand.
+# single-process run. mpi4py needs an MPI implementation at build time
+# (libopenmpi-dev in validation/Dockerfile). That is why this tier runs in a
+# container: on Windows it would mean installing MS-MPI by hand.
 pyuvsim[sim]>=1.4
 pyuvdata>=3.0
 pyradiosky>=1.0

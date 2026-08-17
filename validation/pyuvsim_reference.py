@@ -1,4 +1,4 @@
-"""Tier 2 — cross-check against pyuvsim, the community reference simulator.
+"""Tier 2: cross-check against pyuvsim, the community reference simulator.
 
 Tier 1 (``oracle.py``) proves the correlator implements *our* measurement
 equation correctly. It cannot prove that equation matches what the field
@@ -17,15 +17,15 @@ every run.
 
 All three of these packages make breaking API changes across major versions,
 and this module is glue code across all three. Treat a failure here as
-"investigate the glue code first", not "the correlator is broken" — Tier 1 is
+"investigate the glue code first", not "the correlator is broken". Tier 1 is
 the authority on that. ``diagnose.py`` classifies the residual.
 
 What is compared, and why
 -------------------------
 The comparison is against the Tier 1 *oracle*, not a simulated correlator run.
 The oracle is deterministic, so this isolates the question Tier 2 exists to
-answer — is our measurement equation the one pyuvsim implements? — from
-Monte-Carlo scatter. Tier 1 already shows the correlator reproduces the oracle
+answer, whether our measurement equation is the one pyuvsim implements,
+from Monte-Carlo scatter. Tier 1 already shows the correlator reproduces the oracle
 to ~1e-11, so chaining the two gives correlator == pyuvsim with no statistical
 step in between.
 
@@ -156,7 +156,7 @@ def build_reference(scenario: Scenario, sources_altaz, pc_altaz):
         if max(alt_err, az_err) > 1e-6:
             raise AssertionError(
                 f"AltAz/ICRS round trip off by alt {alt_err:.3e} deg, "
-                f"az {az_err:.3e} deg — the azimuth convention is wrong"
+                f"az {az_err:.3e} deg: the azimuth convention is wrong"
             )
         return radec
 
@@ -234,7 +234,7 @@ def build_reference(scenario: Scenario, sources_altaz, pc_altaz):
 
     # A uniform beam gives unit response everywhere, matching our simulator,
     # which has no primary beam model at all. Restrict it to a single feed so
-    # its polarisations match the UVData object's single 'xx' — a 4-pol beam
+    # its polarisations match the UVData object's single 'xx'. A 4-pol beam
     # against a 1-pol simulation is rejected outright.
     beam_list = pyuvsim.BeamList([
         pyuvdata.analytic_beam.UniformBeam(
@@ -250,7 +250,7 @@ def build_reference(scenario: Scenario, sources_altaz, pc_altaz):
     )
 
     # pyuvsim simulates in the unprojected (drift) frame and *discards* the
-    # phase centre it was handed — `out.phase_center_catalog` comes back as
+    # phase centre it was handed. `out.phase_center_catalog` comes back as
     # {'cat_type': 'unprojected'}. Its visibilities are therefore raw
     # geometric, not fringe-stopped. Comparing them against our fringe-stopped
     # output without this step compares two different quantities and produces
@@ -288,7 +288,7 @@ def closure_phases(vis: dict[tuple[int, int], complex], n_ants: int):
 
 # Two sources. A *single* point source produces a visibility phase that is
 # linear in baseline vector, so its closure phase is identically zero around
-# every triangle no matter where the phase centre points — comparing that
+# every triangle no matter where the phase centre points. Comparing that
 # against pyuvsim compares 0 with 0 and establishes nothing. Two sources make
 # the phase non-linear in baseline and the closure phase genuinely non-trivial.
 SOURCES_ALTAZ = [
@@ -301,7 +301,7 @@ PHASE_CENTRE_ALTAZ = (21.5, 40.0)
 def run() -> bool:
     """Run the Tier 2 comparison. Returns True on agreement."""
     print()
-    print("Tier 2 — pyuvsim cross-check")
+    print("Tier 2: pyuvsim cross-check")
     print()
 
     # Sources are mutually incoherent, as real sky sources are, so the
@@ -331,10 +331,10 @@ def run() -> bool:
 
     # Compare against the analytic oracle rather than a simulated run. The
     # oracle is deterministic, so this isolates the question Tier 2 exists to
-    # answer — "is our measurement equation the same one pyuvsim implements?" —
-    # from Monte-Carlo scatter. Tier 1 has already established, to ~1e-11, that
-    # the correlator reproduces the oracle; chaining the two gives
-    # correlator == pyuvsim without a statistical step in the middle.
+    # answer, whether our measurement equation is the one pyuvsim implements,
+    # from Monte-Carlo scatter. Tier 1 already shows the correlator reproduces
+    # the oracle to ~1e-11, so chaining the two gives correlator == pyuvsim
+    # without a statistical step in the middle.
     #
     # Channel 0 has zero baseband offset, so its absolute sky frequency is
     # exactly sky_freq, matching pyuvsim's single channel.
@@ -423,7 +423,7 @@ def run() -> bool:
     print(f"\n  closure phases agree to {max(diffs):.1e} rad")
     print(f"  spread across triangles in the reference: {cp_spread:.4f} rad")
     if not decisive:
-        print("  NOT DECISIVE — reference closure phases are all ~equal, so this")
+        print("  NOT DECISIVE: reference closure phases are all ~equal, so this")
         print("  comparison cannot tell a correct implementation from a broken")
         print("  one. A single point source always gives zero closure phase;")
         print("  use a model with real structure.")

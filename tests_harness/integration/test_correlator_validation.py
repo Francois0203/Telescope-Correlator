@@ -1,9 +1,9 @@
 """Analytic validation of the full FX chain.
 
-These are the tests that answer "does this correlator actually work?".  Each
-one compares the correlator's output against a value derived independently —
-from closed-form interferometry, from an invariant, or from a second
-implementation — rather than against the correlator's own behaviour.
+These tests answer "does this correlator actually work?". Each compares the
+correlator's output against a value derived independently: from closed-form
+interferometry, from an invariant, or from a second implementation. Never
+against the correlator's own behaviour.
 
 The load-bearing test is :meth:`TestPointSourcePhase.test_off_pointing_phase`.
 A correlator whose delay stage does nothing at all still passes a
@@ -35,8 +35,8 @@ from correlator.core.frontend import (
 
 # A deliberately irregular 3-D array. Integer, symmetric or coplanar layouts
 # can make geometric phases vanish by accident and turn a real test into a
-# tautology — which is exactly how the original test suite came to pass
-# without exercising the delay engine at all.
+# tautology. That is how the original suite passed without exercising the
+# delay engine at all.
 ANT_POS = np.array([
     [  0.00,   0.00,  0.00],
     [ 23.70,  -8.10,  1.30],
@@ -44,7 +44,7 @@ ANT_POS = np.array([
     [ 14.90,  19.60,  0.80],
 ])
 
-SKY_FREQ = 1.42e9          # Hz — HI line
+SKY_FREQ = 1.42e9          # Hz, HI line
 SAMPLE_RATE = 1024.0       # Hz
 N_CHANNELS = 64
 TONE_BIN = 7               # tone lands exactly on this FFT bin
@@ -126,7 +126,7 @@ class TestPointSourcePhase:
     def test_source_at_phase_centre_has_zero_phase(self):
         """A source at the phase centre must produce zero phase everywhere.
 
-        Necessary but not sufficient — see test_off_pointing_phase.
+        Necessary but not sufficient. See test_off_pointing_phase.
         """
         s_hat = direction_from_zenith_angle(np.deg2rad(23.0), azimuth=np.deg2rad(41.0))
         channelised, freqs, _ = channelise([PointSource(s_hat)])
@@ -192,7 +192,7 @@ class TestPointSourcePhase:
             for i, j in get_baseline_indices(len(ANT_POS)) if i != j
         ]
         assert np.max(np.abs(phases)) > 0.5, (
-            "test geometry produces negligible fringe — it would pass trivially"
+            "test geometry produces negligible fringe, so it would pass trivially"
         )
 
     def test_broadband_source_phase_across_all_channels(self):
@@ -308,7 +308,7 @@ class TestFXvsXF:
             X_i[k] * conj(X_j[k]) = FFT(r)[k],
             r[l] = sum_m x_i[(m + l) mod N] * conj(x_j[m])
 
-        Computed here with explicit rolls and sums — no FFT of the inputs.
+        Computed with explicit rolls and sums. No FFT of the inputs.
         """
         n = x_i.size
         lags = np.array([
@@ -385,7 +385,7 @@ class TestVisibilityInvariants:
 
         Independent receiver noise adds power to the autocorrelations but not
         to the cross-correlations, so the ratio must sit just below 1. A ratio
-        above 1 means the cross-correlations are picking up self-power —
+        above 1 means the cross-correlations are picking up self-power,
         typically a conjugation or indexing error.
         """
         channelised, _, _ = channelise(
@@ -426,7 +426,7 @@ class TestAmplitudeScale:
 
     Windows are normalised to unit coherent gain, so the flux scale must be
     identical for every window. The FFT itself carries no ``1/N``, so
-    amplitudes scale as ``n_channels**2`` — a documented convention that flux
+    amplitudes scale as ``n_channels**2``, a documented convention that flux
     calibration absorbs.
     """
 
@@ -435,8 +435,8 @@ class TestAmplitudeScale:
         """A tone of amplitude A on an exact bin gives (A * n_channels)^2.
 
         The expected value comes from the normalisation convention, not from
-        ``FEngine.window`` — deriving it from the object under test would make
-        the assertion vacuous.
+        ``FEngine.window``. Deriving it from the object under test would
+        make the assertion vacuous.
         """
         amplitude = 2.0
         s_hat = direction_from_zenith_angle(np.deg2rad(19.0), np.deg2rad(60.0))
@@ -458,7 +458,7 @@ class TestAmplitudeScale:
             )
 
     def test_windows_suppress_spectral_leakage(self):
-        """The window must actually taper — check leakage, not just gain.
+        """The window must actually taper, so check leakage and not just gain.
 
         Coherent-gain normalisation makes the on-bin amplitude identical for
         every window, so an amplitude test alone can no longer tell whether

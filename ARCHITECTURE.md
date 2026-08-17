@@ -128,7 +128,7 @@ where:
 
 > **The `f_sky` term is not optional.** For a 1.42 GHz observation with a few
 > kHz of bandwidth it exceeds the `f_k` term by six orders of magnitude.
-> Rotating by `f_k` alone — as an earlier version of this code did — discards
+> Rotating by `f_k` alone, as an earlier version of this code did, discards
 > the entire fringe rather than introducing a small error.
 
 #### X-Engine: Correlation
@@ -191,9 +191,10 @@ Each value represents a complex voltage measurement at a single time instant.
 
 The simulator generates signals for multiple sources:
 
-The simulator produces **complex baseband voltages** — what a receiver yields
-after mixing the sky signal down from `sky_freq` — using the same conventions
-as the delay engine, so that fringe stopping has something real to undo.
+The simulator produces **complex baseband voltages**, what a receiver yields
+after mixing the sky signal down from `sky_freq`. It uses the same
+conventions as the delay engine, so fringe stopping has something real to
+undo.
 
 ```python
 # Geometric advance of antenna i toward a source at unit direction ŝ:
@@ -210,8 +211,8 @@ x_i(t) = s(t + a_i) · exp(+2πj · f_sky · a_i)
 ```
 
 Receiver noise is added **independently per antenna** afterwards, so it
-correlates only on the autocorrelations — which is what makes a cross-
-correlation a measurement rather than a power meter.
+correlates only on the autocorrelations. That is what makes a
+cross-correlation a measurement rather than a power meter.
 
 > An earlier version applied `exp(-2πj · (r_i · ŝ))`, treating antenna
 > positions in metres as though they were wavelengths, with no `c` and no
@@ -243,13 +244,13 @@ For each antenna:
 #### Amplitude Normalisation
 
 Windows are scaled by `n_channels / sum(w)` before use. Without this, a taper
-attenuates coherent signals by `sum(w)/N` — about 0.5 for Hanning — so merely
-changing `window` would rescale every visibility and, with it, the flux scale.
+attenuates coherent signals by `sum(w)/N`, about 0.5 for Hanning. Changing
+`window` would then rescale every visibility and the flux scale with it.
 
 | Signal | Channel response |
 |---|---|
-| coherent tone on an exact bin | `A · n_channels` — identical for every window |
-| white noise, variance `σ²` | `σ² · sum(w²)` — window dependent |
+| coherent tone on an exact bin | `A · n_channels`, identical for every window |
+| white noise, variance `σ²` | `σ² · sum(w²)`, window dependent |
 
 Noise power cannot be made window-independent at the same time, because
 equivalent noise bandwidths genuinely differ. `FEngine` exposes both figures
@@ -271,9 +272,9 @@ constant.
   
 - **Hamming**: `w[n] = 0.54 - 0.46·cos(2πn/N)`
   - Pros: Lower *first* sidelobe than Hanning (−43 dB vs −31 dB)
-  - Cons: Far-field rolloff is worse — `1/d²` against Hanning's `1/d³`, so it
-    leaks substantially more power far from the peak. Measured at ~400× more
-    than Hanning beyond 8 channels (`test_windows_suppress_spectral_leakage`).
+  - Cons: Far-field rolloff is worse, `1/d²` against Hanning's `1/d³`, so it
+    leaks far more power away from the peak. Measured at ~400× more than
+    Hanning beyond 8 channels (`test_windows_suppress_spectral_leakage`).
     Prefer Hanning or Blackman when distant leakage matters, which for RFI
     rejection it usually does.
   
@@ -528,7 +529,7 @@ class Config:
     ant_radius: float = 10.0           # metres, for auto-generated circular array
 
     # F-engine
-    n_channels: int = 256              # FFT size — must be a power of 2
+    n_channels: int = 256              # FFT size, must be a power of 2
     window: str = "hanning"            # rectangular / hanning / hamming / blackman
     integration_time: float = 1.0      # seconds per output visibility
 
@@ -549,17 +550,25 @@ class Config:
 
 The `Config` class also provides:
 
-- `validate()` — raises `ValueError` on invalid settings
-- `ant_positions()` — returns an `(n_ants, 2)` array of antenna positions on a uniform circle of radius `ant_radius`
-- `to_yaml(path)` / `from_yaml(path)` — save and load settings as YAML
+- `validate()`: raises `ValueError` on invalid settings
+- `ant_positions()`: returns an `(n_ants, 2)` array of antenna positions on a uniform circle of radius `ant_radius`
+- `to_yaml(path)` / `from_yaml(path)`: save and load settings as YAML
 
-> **Note:** Antenna positions are always auto-generated as a uniform circle from `n_ants` and `ant_radius`; explicit per-antenna positions are not currently a configurable setting. Source angles for simulation are fixed in the pipeline (`[0.0, π/6]`, as zenith angles), the delay phase centre is fixed to zenith `[0.0, 0.0, 1.0]`, and quantization/overlap are not exposed (see the F-engine notes above). The `DelayEngine` and `SimulatedStream` classes accept arbitrary 3-D geometry and phase centres directly — only the `Config`/shell surface is restricted.
+> **Note:** Antenna positions are always auto-generated as a uniform circle
+> from `n_ants` and `ant_radius`. Explicit per-antenna positions are not a
+> configurable setting. Source angles for simulation are fixed in the
+> pipeline (`[0.0, π/6]`, as zenith angles), the delay phase centre is fixed
+> to zenith `[0.0, 0.0, 1.0]`, and quantization and overlap are not exposed.
+> `DelayEngine` and `SimulatedStream` accept arbitrary 3-D geometry and phase
+> centres directly. Only the `Config` and shell surface is restricted.
 
 ## Configuration System
 
 ### How settings are set
 
-Settings start at the dataclass defaults and are changed interactively in the shell with `set KEY VALUE`. There is **no command-line argument parsing** — the application is a single interactive shell (`python -m correlator`).
+Settings start at the dataclass defaults and change interactively in the
+shell with `set KEY VALUE`. There is **no command-line argument parsing**.
+The application is a single interactive shell (`python -m correlator`).
 
 Every run writes the `Config` that was used to `config.yaml` in the output directory, so any run can be reproduced.
 
@@ -731,7 +740,7 @@ Runtime is dominated by the X-engine for large arrays (`O(N² · T)`) and by the
 ```
 app/src/correlator/
 ├── __init__.py           # Package exports (Config, FEngine, XEngine, DelayEngine, ...)
-├── __main__.py           # Entry point — launches the interactive shell
+├── __main__.py           # Entry point, launches the interactive shell
 ├── config.py             # Config dataclass (settings, validation, YAML I/O)
 ├── shell.py              # Interactive shell (cmd.Cmd): run/set/config/list/plot/...
 ├── pipeline.py           # FX pipeline orchestration (pipeline.run)
@@ -757,7 +766,7 @@ class SimulatedStream(DataSource): ...
 class BatchFileSource(DataSource): ...
 ```
 
-**2. Pipeline Pattern (Processing)** — see [`pipeline.py`](app/src/correlator/pipeline.py)
+**2. Pipeline Pattern (Processing)**, see [`pipeline.py`](app/src/correlator/pipeline.py)
 ```python
 for chunk in source:                                     # (n_ants, chunk_size)
     channelised = fengine.process_chunk(chunk)           # (n_ants, n_spectra, n_channels)
@@ -825,9 +834,13 @@ Synthetic signals come from `correlator.core.frontend.SimulatedStream`, which
 is the same generator the pipeline uses, so tests exercise the production code
 path rather than a parallel one that can drift away from it.
 
-**Unit Tests** — exercise individual components in isolation: window functions and FFT output shape/Parseval (`test_fengine`), baseline count/ordering and autocorrelation reality/Hermitian symmetry (`test_xengine`), geometric delays for zenith/horizon sources (`test_delay`), the simulated/batch data sources (`test_frontend`), and config loading including rejection of unknown keys (`test_config`).
+**Unit Tests** exercise components in isolation: window functions and FFT
+shape/Parseval (`test_fengine`), baseline count/ordering and autocorrelation
+reality/Hermitian symmetry (`test_xengine`), geometric delays for
+zenith/horizon sources (`test_delay`), the data sources (`test_frontend`),
+and config loading including rejection of unknown keys (`test_config`).
 
-**Integration Tests** — run the full FX pipeline end-to-end:
+**Integration Tests** run the full FX pipeline end-to-end:
 ```python
 def test_end_to_end_pipeline():
     cfg = Config(n_ants=4, n_channels=256, duration=2.0)
@@ -836,17 +849,24 @@ def test_end_to_end_pipeline():
     # ... assert visibility files were written
 ```
 
-**Accuracy / Validation Tests** — compare results to values derived independently of the correlator (`test_accuracy`, `test_astronomical_accuracy`, `test_correlator_validation`):
+**Accuracy / Validation Tests** compare results against values derived
+independently of the correlator (`test_accuracy`, `test_astronomical_accuracy`,
+`test_correlator_validation`):
 
-- **Off-pointing phase.** The load-bearing test. Deliberately mis-point the phase centre by a known angle and assert the residual fringe matches `2π(f_sky + f_k)·b_ij·(ŝ − s0)/c`. A source *at* the phase centre gives zero phase — but so does a delay engine that does nothing, so an on-axis test alone proves nothing.
+- **Off-pointing phase.** The load-bearing test. Mis-point the phase centre by a known angle and assert the residual fringe matches `2π(f_sky + f_k)·b_ij·(ŝ − s0)/c`. A source *at* the phase centre gives zero phase, but so does a delay engine that does nothing. An on-axis test alone proves nothing.
 - **Closure phase.** `arg(V_ij) + arg(V_jk) − arg(V_ik)` must vanish for a point source, and must keep vanishing when arbitrary per-antenna phase errors are injected.
 - **FX versus XF.** Cross-check against a lag-domain correlator that shares no code with `FEngine` or `XEngine`.
 - **Invariants.** Cauchy–Schwarz (`|V_ij|² ≤ V_ii·V_jj`), conjugate symmetry, autocorrelation reality, amplitude preservation under fringe stopping.
-- **Window behaviour.** Amplitude independence across windows, plus a spectral-leakage test — since coherent-gain normalisation makes the on-bin amplitude window-independent, only leakage can show that windowing happens at all.
+- **Window behaviour.** Amplitude independence across windows, plus a spectral-leakage test. Coherent-gain normalisation makes the on-bin amplitude window-independent, so only leakage can show that windowing happens at all.
 
 > **On test geometry.** Use irregular, genuinely 3-D antenna layouts. An earlier version of this suite passed while testing nothing: the simulator defaulted to a 10 m circle at integer coordinates, its geometric term `exp(-2πj·x)` was identically 1 for integer `x`, every antenna received the same signal, and the phase centre was orthogonal to the planar array so the delay stage was a no-op. The tests then asserted the phase was zero. They could not fail.
 
-**External validation** — [`validation/`](validation/) holds an optional harness that re-derives expected visibilities from the measurement equation independently of the correlator, and can cross-check against [pyuvsim](https://github.com/RadioAstronomySoftwareGroup/pyuvsim). It is detachable: nothing in `app/src` imports it and it is excluded from the Docker image.
+**External validation.** [`validation/`](validation/) holds an optional
+harness that re-derives expected visibilities from the measurement equation
+independently of the correlator, and can cross-check against
+[pyuvsim](https://github.com/RadioAstronomySoftwareGroup/pyuvsim). It is
+detachable: nothing in `app/src` imports it and it is excluded from the
+Docker image.
 
 ### Console Output
 
@@ -873,7 +893,10 @@ Errors raised during a run (e.g. validation failures, missing input files) are c
 
 ### Test Signals
 
-**File:** `workspace/inputs/generate_test_data.py` — run it (`python workspace/inputs/generate_test_data.py`) to write the datasets below as `.npy` files alongside the script. Each is a complex `(n_ants, n_samples)` array suitable for `mode=file`.
+**File:** `workspace/inputs/generate_test_data.py`. Run it (`python
+workspace/inputs/generate_test_data.py`) to write the datasets below as
+`.npy` files alongside the script. Each is a complex `(n_ants, n_samples)`
+array suitable for `mode=file`.
 
 **1. Simple Signal** (`simple_signal.npy`)
 - 4 antennas, 4096 samples
@@ -1051,7 +1074,9 @@ plt.savefig('radio_image.png')
 
 ### Docker Deployment
 
-The image is built from a multi-stage [`app/Dockerfile`](app/Dockerfile) and defaults to launching the interactive shell. (Abbreviated — see the file for the full builder stage.)
+The image is built from a multi-stage [`app/Dockerfile`](app/Dockerfile) and
+defaults to launching the interactive shell. Abbreviated below; see the file
+for the full builder stage.
 
 ```dockerfile
 FROM python:3.11-slim AS builder

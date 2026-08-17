@@ -1,25 +1,23 @@
-"""Frontend: Data Ingestion Module
+"""Frontend: antenna data ingestion.
 
-Handles loading antenna time-series data from various sources:
-- Batch mode: Load from files (numpy arrays, raw binary)
-- Simulated streaming: Generate synthetic antenna voltages and stream them
+Two sources:
+- Batch: load from files (numpy arrays, raw binary)
+- Simulated: generate synthetic antenna voltages and stream them
 
-The simulator generates **complex baseband voltages**, i.e. what a receiver
-produces after mixing the sky signal down from ``sky_freq``.  It uses exactly
-the same sign and unit conventions as :mod:`correlator.core.delay` — see that
-module's docstring.  Concretely, for a point source at direction ``s_hat`` with
-per-antenna geometric advance ``a_i = (r_i . s_hat) / c`` seconds:
+The simulator produces **complex baseband voltages**, what a receiver gives
+after mixing down from ``sky_freq``. Sign and unit conventions match
+:mod:`correlator.core.delay`; see that module's docstring. For a point source
+at ``s_hat`` with per-antenna advance ``a_i = (r_i . s_hat) / c`` seconds::
 
     x_i(t) = s(t + a_i) * exp(+2j*pi * f_sky * a_i)
 
-where ``s(t)`` is the baseband envelope shared by all antennas.  The
-``exp(2j*pi*f_sky*a_i)`` factor is the fringe term the correlator's delay
-engine exists to remove; without it there is nothing for fringe stopping to do
-and no end-to-end test of the delay stage is meaningful.
+``s(t)`` is the baseband envelope shared by all antennas. The
+``exp(2j*pi*f_sky*a_i)`` factor is the fringe term the delay engine removes.
+Without it, fringe stopping has nothing to do and no end-to-end test of the
+delay stage means anything.
 
-Receiver noise is added **independently per antenna** after the sky signal, so
-it correlates only on the autocorrelations — which is what makes cross-
-correlation a meaningful measurement in the first place.
+Receiver noise is added **independently per antenna**, so it correlates only
+on the autocorrelations. That is what makes cross-correlation a measurement.
 """
 from __future__ import annotations
 
@@ -139,8 +137,8 @@ class SimulatedStream(DataSource):
                 over ``source_angles``.
             sky_freq: Sky (RF) frequency in Hz that baseband was mixed down
                 from.  Must match the ``reference_freq`` given to
-                :class:`~correlator.core.delay.DelayEngine`.  Defaults to 0,
-                which produces no fringe term — useful for isolating the
+                :class:`~correlator.core.delay.DelayEngine`. Defaults to 0,
+                which produces no fringe term. Useful for isolating the
                 channeliser, but not a meaningful end-to-end test.
             signal_type: ``"tone"`` for a monochromatic baseband tone (exact,
                 good for analytic tests) or ``"noise"`` for band-limited
@@ -177,12 +175,11 @@ class SimulatedStream(DataSource):
         if signal_type not in ("tone", "noise"):
             raise ValueError(f"signal_type must be 'tone' or 'noise', got {signal_type!r}")
 
-        # A tone above Nyquist aliases. The sampled sequence is then
-        # indistinguishable from one at the aliased frequency, but the delay
-        # applied here would use the un-aliased frequency while the correlator
-        # de-rotates the aliased channel — leaving a spurious residual phase of
-        # 2*pi*sample_rate*advance. Real receivers band-limit before sampling;
-        # reject the invalid input rather than silently producing it.
+        # A tone above Nyquist aliases. The delay applied here would use the
+        # un-aliased frequency while the correlator de-rotates the aliased
+        # channel, leaving a spurious residual phase of
+        # 2*pi*sample_rate*advance. Real receivers band-limit before sampling,
+        # so reject the input rather than silently producing it.
         if signal_type == "tone" and abs(freq) > sample_rate / 2:
             raise ValueError(
                 f"tone frequency {freq} Hz exceeds Nyquist ({sample_rate / 2} Hz) "
@@ -214,7 +211,7 @@ class SimulatedStream(DataSource):
             fringe = np.exp(2j * np.pi * self.sky_freq * advance)      # (n_ants,)
 
             if self.signal_type == "tone":
-                # s(t + a) = exp(2j*pi*f_bb*(t + a)) — closed form, exact.
+                # s(t + a) = exp(2j*pi*f_bb*(t + a)). Closed form, exact.
                 envelope = np.exp(2j * np.pi * self.freq * t)          # (chunk,)
                 tone_delay = np.exp(2j * np.pi * self.freq * advance)  # (n_ants,)
                 contribution = np.outer(src.amplitude * fringe * tone_delay, envelope)

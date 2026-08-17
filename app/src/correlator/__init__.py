@@ -1,4 +1,4 @@
-"""Telescope Correlator — FX Architecture."""
+"""Telescope Correlator: FX architecture."""
 from correlator.config import Config
 from correlator.core.fengine import FEngine
 from correlator.core.xengine import XEngine

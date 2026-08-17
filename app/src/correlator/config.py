@@ -13,7 +13,7 @@ class Config:
     ant_radius: float = 10.0           # metres, for auto-generated circular array
 
     # F-engine
-    n_channels: int = 256              # FFT size — must be a power of 2
+    n_channels: int = 256              # FFT size, must be a power of 2
     window: str = "hanning"            # rectangular / hanning / hamming / blackman
     integration_time: float = 1.0      # seconds per output visibility
 
@@ -60,11 +60,8 @@ class Config:
     def from_yaml(cls, path: str | Path) -> "Config":
         """Load a config file.
 
-        Unknown keys are an error rather than being skipped. Silently dropping
-        them means a typo, or a file written for an older schema, produces a
-        run at default settings that looks successful and is not what was
-        asked for — the most expensive kind of failure, because nothing
-        reports it.
+        Unknown keys raise instead of being skipped. Dropping them silently
+        would let a typo run at default settings and look successful.
         """
         with open(path) as f:
             data = yaml.safe_load(f) or {}

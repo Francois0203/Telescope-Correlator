@@ -7,7 +7,7 @@ bookkeeping, not physics. This tool says which:
 
     constant complex ratio     agreement, differing only in units and sign
     antenna-based residual     phase-centre / w-term / phasing convention
-    baseline-based residual    genuine geometry error — look at the correlator
+    baseline-based residual    genuine geometry error, look at the correlator
 
 It also prints raw visibilities for a source placed exactly at the phase
 centre, where every phase must be zero. That single case is the fastest way to

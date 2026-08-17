@@ -1,5 +1,5 @@
 #!/bin/bash
-# Telescope Correlator — usage: ./correlator [build|test|validate|help]
+# Telescope Correlator. Usage: ./correlator [build|test|validate|help]
 
 IMAGE="telescope-correlator"
 

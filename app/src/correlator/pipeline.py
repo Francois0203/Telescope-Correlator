@@ -2,11 +2,11 @@
 
 Stages
 ------
-1. Frontend   — generate or load time-domain antenna signals
-2. F-engine   — windowed FFT → frequency channels
-3. Delay      — geometric delay compensation (fringe stopping)
-4. X-engine   — cross-multiply → visibilities, integrate over time
-5. Output     — save visibility products
+1. Frontend:  generate or load time-domain antenna signals
+2. F-engine:  windowed FFT into frequency channels
+3. Delay:     geometric delay compensation (fringe stopping)
+4. X-engine:  cross-multiply into visibilities, integrate over time
+5. Output:    save visibility products
 """
 from __future__ import annotations
 from pathlib import Path
@@ -55,9 +55,9 @@ def run(cfg: Config) -> int:
                   f"processing {max_chunks * chunk_size / cfg.sample_rate:.4f} s)")
             print()
 
-        # Two point sources: one at zenith (the phase centre, so it integrates
-        # up coherently) and one 30 degrees away (so it fringes and averages
-        # down). sky_freq must match the DelayEngine reference_freq below.
+        # Two sources: one at zenith (the phase centre, integrates coherently)
+        # and one 30 degrees off (fringes and averages down).
+        # sky_freq must match the DelayEngine reference_freq below.
         source = SimulatedStream(
             n_ants=cfg.n_ants,
             sample_rate=cfg.sample_rate,

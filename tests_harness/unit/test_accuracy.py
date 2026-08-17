@@ -31,8 +31,8 @@ class TestCorrelatorAccuracy:
 
         # Expected advance for antenna 1 relative to antenna 0:
         #   a = (baseline . source_unit_vector) / c
-        # Use the same constant the engine uses — a 3e8 approximation is wrong
-        # by 7e-4 relative, which swamps a 1e-12 absolute tolerance.
+        # Use the same constant the engine uses. A 3e8 approximation is
+        # wrong by 7e-4 relative, which swamps a 1e-12 tolerance.
         expected_delay = (100 * np.cos(np.pi / 4)) / C_LIGHT
         assert np.abs(delays[1] - expected_delay) < 1e-15
 

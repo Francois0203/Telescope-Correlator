@@ -1,4 +1,4 @@
-"""Telescope Correlator — FX Architecture
+"""Telescope Correlator: FX architecture.
 
 Start the interactive shell:
     python -m correlator

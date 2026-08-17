@@ -1,8 +1,8 @@
 # Validation image: the correlator plus the Tier 2 reference stack.
 #
-# Deliberately self-contained rather than layered on telescope-correlator:latest,
-# so it can be built and run on its own — `docker build -f validation/Dockerfile .`
-# works on a bare server with no prior images and no build ordering to remember.
+# Self-contained rather than layered on telescope-correlator:latest, so
+# `docker build -f validation/Dockerfile .` works on a bare server with no
+# prior images and no build ordering to remember.
 #
 # Build context is the repository root:
 #     docker build -f validation/Dockerfile -t telescope-correlator-validation .
@@ -30,11 +30,10 @@ RUN pip install --no-cache-dir -r /tmp/validation-requirements.txt
 COPY app/src/ /app/src/
 RUN pip install --no-cache-dir /app/src/
 
-# Validation harness and the project's own test suite, so one image can run
-# every check. The shipped configs come too: tests_harness/unit/test_config.py
-# asserts every key in them is a real Config field, and silently skips if they
-# are absent — which would quietly drop the check that stops those files
-# drifting out of sync again.
+# Validation harness and the project's own test suite, so one image runs every
+# check. The shipped configs come too: tests_harness/unit/test_config.py
+# asserts every key in them is a real Config field, and skips silently if they
+# are absent. Without them, that check quietly disappears.
 COPY validation/ /app/validation/
 COPY tests_harness/ /app/tests_harness/
 COPY workspace/configs/ /app/workspace/configs/

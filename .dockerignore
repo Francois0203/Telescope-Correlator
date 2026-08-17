@@ -25,8 +25,8 @@ wheels/
 MANIFEST
 
 # validation/ stays in the build context because validation/Dockerfile needs
-# it. It is not copied into the correlator image — app/Dockerfile only takes
-# requirements.txt and app/src/ — so the runtime image is unaffected.
+# it. The correlator image is unaffected: app/Dockerfile copies only
+# requirements.txt and app/src/.
 
 # Reports written by the validation container.
 validation/reports/
